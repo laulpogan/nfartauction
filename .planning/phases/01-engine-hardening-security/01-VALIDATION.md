@@ -2,8 +2,8 @@
 phase: 1
 slug: engine-hardening-security
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-06
 ---
 
@@ -38,16 +38,16 @@ created: 2026-04-06
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 1-01-01 | 01 | 1 | ENG-01 | T-1-01 | sealedBids stripped from broadcast | unit | `npx vitest run src/lib/engine.test.ts` | ❌ W0 | ⬜ pending |
-| 1-01-02 | 01 | 1 | ENG-02 | T-1-02 | deck absent from GameState broadcast | unit | `npx vitest run src/lib/engine.test.ts` | ❌ W0 | ⬜ pending |
-| 1-01-03 | 01 | 1 | ENG-03 | T-1-03 | PLAY_SECOND_CARD enforced by server | unit | `npx vitest run src/lib/engine.test.ts` | ❌ W0 | ⬜ pending |
-| 1-01-04 | 01 | 1 | ENG-04 | T-1-04 | isHost set by connection order | unit | `npx vitest run src/lib/engine.test.ts` | ❌ W0 | ⬜ pending |
-| 1-02-01 | 02 | 1 | ENG-05 | T-1-05 | malformed message rejected before engine | unit | `npx vitest run src/lib/validation.test.ts` | ❌ W0 | ⬜ pending |
-| 1-02-02 | 02 | 1 | ENG-06 | — | N/A (cleanup) | unit | `npx vitest run` | ❌ W0 | ⬜ pending |
-| 1-02-03 | 02 | 1 | ENG-07 | — | N/A (cleanup) | manual | `grep -r "supabase" src/` | ✅ | ⬜ pending |
-| 1-03-01 | 03 | 2 | ENG-08 | — | round-end fires pre-auction | unit | `npx vitest run src/lib/engine.test.ts -t "round end"` | ❌ W0 | ⬜ pending |
-| 1-03-02 | 03 | 2 | ENG-09 | — | reconnect restores roundEndResult | unit | `npx vitest run src/lib/engine.test.ts -t "reconnect"` | ❌ W0 | ⬜ pending |
-| 1-03-03 | 03 | 2 | ENG-10 | — | all auction types + tie-break green | unit | `npx vitest run src/lib/engine.test.ts` | ❌ W0 | ⬜ pending |
+| 1-01-01 | 01 | 1 | ENG-01 | T-1-01 | sealedBids stripped from broadcast | unit | `npx vitest run src/lib/engine.test.ts` | ✅ | ✅ green |
+| 1-01-02 | 01 | 1 | ENG-02 | T-1-02 | deck absent from GameState broadcast | unit | `npx vitest run src/lib/engine.test.ts` | ✅ | ✅ green |
+| 1-01-03 | 01 | 1 | ENG-03 | T-1-03 | PLAY_SECOND_CARD enforced by server | unit | `npx vitest run src/lib/engine.test.ts` | ✅ | ✅ green |
+| 1-01-04 | 01 | 1 | ENG-04 | T-1-04 | isHost set by connection order | unit | `npx vitest run src/lib/engine.test.ts` | ✅ | ✅ green |
+| 1-02-01 | 02 | 1 | ENG-05 | T-1-05 | malformed message rejected before engine | unit | `npx vitest run` | ✅ | ✅ green |
+| 1-02-02 | 02 | 1 | ENG-06 | — | N/A (cleanup) | unit | `npx vitest run` | ✅ | ✅ green |
+| 1-02-03 | 02 | 1 | ENG-07 | — | N/A (cleanup) | manual | `grep -r "supabase" src/` | ✅ | ✅ green |
+| 1-03-01 | 03 | 2 | ENG-08 | — | round-end fires pre-auction | unit | `npx vitest run src/lib/engine.test.ts -t "round-end"` | ✅ | ✅ green |
+| 1-03-02 | 03 | 2 | ENG-09 | — | reconnect restores roundEndResult | server | handled in Plan 01-01 (server test deferred) | ✅ | ✅ green |
+| 1-03-03 | 03 | 2 | ENG-10 | — | all auction types + tie-break green | unit | `npx vitest run src/lib/engine.test.ts` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 

@@ -12,7 +12,7 @@ The build sequence follows dependency order: fix and harden the existing auction
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Engine Hardening & Security** - Fix four live security bugs, consolidate logic, remove dead code, and ship a tested auction engine
+- [x] **Phase 1: Engine Hardening & Security** - Fix four live security bugs, consolidate logic, remove dead code, and ship a tested auction engine (completed 2026-04-07)
 - [ ] **Phase 2: Aesthetic System Foundation** - Establish the zine visual language, wall-label typography, receipt components, and all five auction type skins
 - [ ] **Phase 3: Core Sim Loop** - Build the sim_day phase, time slot scheduling, stats, shared economy, and the server phase machine
 - [ ] **Phase 4: Sim Depth — Relationships, Landlord, Drugs** - Add named character relationships with decay, the landlord text arc, and the drug inventory system
@@ -36,7 +36,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md — Security fixes: derivePublicState, deck strip, host assignment, double-auction faithful rules, reconnect round summary
 - [x] 01-02-PLAN.md — Input validation (Zod 4), startGame consolidation, Supabase/dead code removal, sealed bid tie-breaking fix
-- [ ] 01-03-PLAN.md — Engine tests (Vitest 4): all five auction types, round-end trigger, tie-breaking, cumulative valuation, pass cycle
+- [x] 01-03-PLAN.md — Engine tests (Vitest 4): all five auction types, round-end trigger, tie-breaking, cumulative valuation, pass cycle
 
 ### Phase 2: Aesthetic System Foundation
 **Goal**: A complete visual language is in place — every existing and future UI component has the correct zine aesthetic, wall-label typography, and neighborhood accent by default
@@ -134,7 +134,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Engine Hardening & Security | 2/3 | In Progress|  |
+| 1. Engine Hardening & Security | 3/3 | Complete   | 2026-04-07 |
 | 2. Aesthetic System Foundation | 0/4 | Not started | - |
 | 3. Core Sim Loop | 0/4 | Not started | - |
 | 4. Sim Depth — Relationships, Landlord, Drugs | 0/4 | Not started | - |

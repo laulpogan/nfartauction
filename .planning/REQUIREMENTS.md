@@ -14,9 +14,9 @@
 - [x] **ENG-05**: All inbound WebSocket messages are validated by Zod schemas before reaching engine functions
 - [x] **ENG-06**: `startGame` logic lives in the engine function, not duplicated inline in the server
 - [x] **ENG-07**: Dead Supabase module (`src/lib/supabase.ts`), orphaned SQL files, and unused `zustand` dependency are removed
-- [ ] **ENG-08**: Round-end trigger fires when the 5th painting of any artist is put up for auction (not after auction resolves)
+- [x] **ENG-08**: Round-end trigger fires when the 5th painting of any artist is put up for auction (not after auction resolves)
 - [x] **ENG-09**: A reconnecting player receives the last round summary state (not lost on WebSocket reconnect)
-- [ ] **ENG-10**: Engine has unit tests covering all five auction types, cumulative valuation, round-end trigger, and sealed-bid tie-breaking
+- [x] **ENG-10**: Engine has unit tests covering all five auction types, cumulative valuation, round-end trigger, and sealed-bid tie-breaking
 
 ### Aesthetic System
 
@@ -129,9 +129,9 @@
 | ENG-05 | Phase 1 — Engine Hardening & Security | Complete |
 | ENG-06 | Phase 1 — Engine Hardening & Security | Complete |
 | ENG-07 | Phase 1 — Engine Hardening & Security | Complete |
-| ENG-08 | Phase 1 — Engine Hardening & Security | Pending |
+| ENG-08 | Phase 1 — Engine Hardening & Security | Complete |
 | ENG-09 | Phase 1 — Engine Hardening & Security | Complete |
-| ENG-10 | Phase 1 — Engine Hardening & Security | Pending |
+| ENG-10 | Phase 1 — Engine Hardening & Security | Complete |
 | AEST-01 | Phase 2 — Aesthetic System Foundation | Pending |
 | AEST-02 | Phase 2 — Aesthetic System Foundation | Pending |
 | AEST-03 | Phase 2 — Aesthetic System Foundation | Pending |
