@@ -70,7 +70,7 @@ Plans:
 
 Plans:
 - [x] 03-01-PLAN.md — Type layer + sim-engine pure functional core (GamePhase, SimState, PlayerSimState, sim-config constants, resolveSlots/advanceDay/applySimModifiers + tests)
-- [ ] 03-02-PLAN.md — Server phase machine, SUBMIT_SLOTS Zod handler, per-connection YOUR_SIM_STATE, 60-second hard timeout
+- [x] 03-02-PLAN.md — Server phase machine, SUBMIT_SLOTS Zod handler, per-connection YOUR_SIM_STATE, 60-second hard timeout
 - [ ] 03-03-PLAN.md — useGame YOUR_SIM_STATE wiring, useSim hook, Zustand 5 reactivation as ephemeral session + persisted player stores
 - [ ] 03-04-PLAN.md — SimPanel UI tree (StatDisplay, SlotPicker, NeighborhoodMap, GlobalStatsBar, DayResultReceipt) + GamePage phase routing
 **UI hint**: yes
