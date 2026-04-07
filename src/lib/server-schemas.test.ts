@@ -126,3 +126,44 @@ describe('InboundMessage regression — existing variants still validate', () =>
     expect(result.success).toBe(true)
   })
 })
+
+// ─── Phase 5 Plan 01: NFT message schema gates ─────────────────────────────
+
+describe('InboundMessage CONVERT_NFT validation', () => {
+  it('accepts a well-formed CONVERT_NFT with amount=10', () => {
+    const result = InboundMessageSchema.safeParse({ type: 'CONVERT_NFT', amount: 10 })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects amount=0', () => {
+    const result = InboundMessageSchema.safeParse({ type: 'CONVERT_NFT', amount: 0 })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects amount=-1', () => {
+    const result = InboundMessageSchema.safeParse({ type: 'CONVERT_NFT', amount: -1 })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects amount=1001 (above DoS cap T-5-08)', () => {
+    const result = InboundMessageSchema.safeParse({ type: 'CONVERT_NFT', amount: 1001 })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects non-integer amount', () => {
+    const result = InboundMessageSchema.safeParse({ type: 'CONVERT_NFT', amount: 1.5 })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects missing amount field', () => {
+    const result = InboundMessageSchema.safeParse({ type: 'CONVERT_NFT' })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('InboundMessage PURCHASE_NFT_WHITELIST validation', () => {
+  it('accepts the bare message', () => {
+    const result = InboundMessageSchema.safeParse({ type: 'PURCHASE_NFT_WHITELIST' })
+    expect(result.success).toBe(true)
+  })
+})

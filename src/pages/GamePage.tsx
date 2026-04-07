@@ -94,6 +94,8 @@ export function GamePage() {
           playerSim={playerSim}
           sessionId={sessionId}
           submitSlots={actions.submitSlots}
+          convertNft={actions.convertNft}
+          purchaseNftWhitelist={actions.purchaseNftWhitelist}
         />
       )
     case 'auction_round':

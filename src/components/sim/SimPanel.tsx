@@ -14,12 +14,15 @@ import { DayResultReceipt } from './DayResultReceipt'
 import { RelationshipPanel } from './RelationshipPanel'
 import { LandlordMessages } from './LandlordMessages'
 import { DrugInventory } from './DrugInventory'
+import { NftPanel } from './NftPanel'
 
 export interface SimPanelProps {
   game: GameState | null
   playerSim: PlayerSimState | null
   sessionId: string
   submitSlots: (slots: TimeSlot[]) => void
+  convertNft?: (amount: number) => void
+  purchaseNftWhitelist?: () => void
 }
 
 export function SimPanel({
@@ -27,6 +30,8 @@ export function SimPanel({
   playerSim,
   sessionId,
   submitSlots,
+  convertNft,
+  purchaseNftWhitelist,
 }: SimPanelProps) {
   const {
     sim,
@@ -75,6 +80,12 @@ export function SimPanel({
         />
         <LandlordMessages playerSim={playerSim} />
         <DrugInventory playerSim={playerSim} />
+        <NftPanel
+          playerSim={playerSim}
+          nftHypeCycle={sim?.nftHypeCycle ?? 0}
+          onConvert={(amount) => convertNft?.(amount)}
+          onPurchase={() => purchaseNftWhitelist?.()}
+        />
         <NeighborhoodMap
           selected={selectedNeighborhood}
           onSelect={setSelectedNeighborhood}

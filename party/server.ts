@@ -21,15 +21,22 @@ import {
   removeDrugItem,
   applyDrugEffects,
   accumulateRisk,
+  convertNft,
+  purchaseNftWhitelist,
+  applyNftHypeDrift,
+  computeNftExchangeRate,
+  updateRelationship,
 } from '../src/lib/sim-engine'
 import {
   SIM_CONFIG,
   DRUG_CONFIG,
   DRUG_DEFINITIONS,
+  NFT_CONFIG,
+  NFT_ITEM_DEFINITIONS,
   createInitialPlayerSimState,
   createInitialSimState,
 } from '../src/lib/sim-config'
-import type { DrugItemKind } from '../src/types/game'
+import type { DrugItemKind, NftRarity, NftItem } from '../src/types/game'
 import type { PlayerRecord } from '../src/types/game'
 
 // ─── Inbound message schema (ENG-05) ──────────────────────────────────────────
@@ -72,6 +79,12 @@ const InboundMessage = z.discriminatedUnion('type', [
   // Phase 3 sim-loop: player submits their day plan. Zod caps array length
   // at 20 to bound worst-case work per message (T-3-10 DoS mitigation).
   z.object({ type: z.literal('SUBMIT_SLOTS'), slots: z.array(TimeSlotSchema).max(20) }),
+  // Phase 5 Plan 01: NFT parallel economy. CONVERT_NFT debits the player's
+  // nftWallet and credits player.money at the hype-driven exchange rate.
+  // PURCHASE_NFT_WHITELIST is a server-rolled draw with deterministic cost
+  // (no client-supplied amount field — T-5-02 mitigation).
+  z.object({ type: z.literal('CONVERT_NFT'), amount: z.number().int().min(1).max(1000) }),
+  z.object({ type: z.literal('PURCHASE_NFT_WHITELIST') }),
 ])
 type InboundMessage = z.infer<typeof InboundMessage>
 
@@ -615,6 +628,157 @@ export default class GameServer implements Party.Server {
       }
       return
     }
+
+    // ── CONVERT_NFT (Phase 5 Plan 01) ───────────────────────────────────────
+    //
+    // Player explicitly converts nftWallet currency to player.money at the
+    // hype-driven exchange rate. Gating mirrors SUBMIT_SLOTS: must be in a
+    // sim_day or auction_round phase, must be a known session, and the
+    // player's nftWalletUnlocked must be true (T-5-05: only the threshold-
+    // cross detector inside advanceFromSimDay can flip that bit).
+    if (msg.type === 'CONVERT_NFT') {
+      if (!this.state) return
+      const phaseType = this.state.game.phase.type
+      if (phaseType !== 'sim_day' && phaseType !== 'auction_round') {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'NFT actions only available during play' }))
+        return
+      }
+      const session = this.state.sessions[sessionId]
+      if (!session) {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'Unknown player' }))
+        return
+      }
+      const ps = this.state.playerSim[sessionId]
+      if (!ps) {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'No sim state for player' }))
+        return
+      }
+      if (!ps.nftWalletUnlocked) {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'NFT wallet locked' }))
+        return
+      }
+      const rate = computeNftExchangeRate(this.state.sim.nftHypeCycle)
+      const { updatedPlayerSim, moneyDelta } = convertNft(ps, msg.amount, rate)
+      if (moneyDelta === 0) {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'NFT conversion rejected' }))
+        return
+      }
+      this.state.playerSim[sessionId] = updatedPlayerSim
+      // Mirror moneyDelta onto the public player projection.
+      this.state.game = {
+        ...this.state.game,
+        players: this.state.game.players.map(p =>
+          p.sessionId === sessionId ? { ...p, money: p.money + moneyDelta } : p,
+        ),
+      }
+      this.state = syncSessions(this.state)
+      await this.persist()
+      this.broadcastStateSecure()
+      sender.send(JSON.stringify({ type: 'YOUR_SIM_STATE', simState: this.state.playerSim[sessionId] }))
+      return
+    }
+
+    // ── PURCHASE_NFT_WHITELIST (Phase 5 Plan 01) ────────────────────────────
+    //
+    // Server-rolled NFT draw. Cost is a server constant (NFT_CONFIG.whitelist
+    // Cost — T-5-02). On a 50/50 hit, the server picks a uniform NftRarity,
+    // generates an id (crypto.randomUUID with the same Date.now+Math.random
+    // fallback drug acquisition uses), and constructs an NftItem from
+    // NFT_ITEM_DEFINITIONS[rarity]. On a miss, the cost is still debited.
+    //
+    // Faction reaction pass runs unconditionally on every successful purchase
+    // (T-5-06): Sculptor relationships -3, Social/Political -5. If at least
+    // one Social/Political relationship was hit, broadcast NFT_DENOUNCEMENT
+    // to the room with the player's displayName.
+    if (msg.type === 'PURCHASE_NFT_WHITELIST') {
+      if (!this.state) return
+      const phaseType = this.state.game.phase.type
+      if (phaseType !== 'sim_day' && phaseType !== 'auction_round') {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'NFT actions only available during play' }))
+        return
+      }
+      const session = this.state.sessions[sessionId]
+      if (!session) {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'Unknown player' }))
+        return
+      }
+      const ps = this.state.playerSim[sessionId]
+      if (!ps) {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'No sim state for player' }))
+        return
+      }
+      if (!ps.nftWalletUnlocked) {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'NFT wallet locked' }))
+        return
+      }
+      if (ps.nftWallet < NFT_CONFIG.whitelistCost) {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'Insufficient NFT balance' }))
+        return
+      }
+
+      // Server-side entropy boundary: Math.random and crypto.randomUUID stay
+      // here. The pure engine receives the constructed NftItem (or null on
+      // a miss) and only does the debit + append.
+      const NFT_RARITIES: NftRarity[] = ['common', 'uncommon', 'rare', 'legendary']
+      let item: NftItem | null = null
+      if (Math.random() < 0.5) {
+        const rarity = NFT_RARITIES[Math.floor(Math.random() * NFT_RARITIES.length)]
+        const def = NFT_ITEM_DEFINITIONS[rarity]
+        const id =
+          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `nft-${Date.now()}-${Math.floor(Math.random() * 1e9)}`
+        item = {
+          id,
+          rarity,
+          displayLabel: def.displayLabel,
+          displayMeta: def.displayMeta,
+          baseValue: def.baseValue,
+        }
+      }
+      let next = purchaseNftWhitelist(ps, item)
+
+      // Faction reaction pass — runs on every successful purchase, regardless
+      // of whether an item was rolled. The cost was paid; the denouncement
+      // happens. T-5-06 mitigation: client cannot omit this step.
+      let socialPoliticalHit = false
+      let nextRelationships = next.relationships
+      for (const r of next.relationships) {
+        if (r.factionAlignment === 'sculptors') {
+          nextRelationships = updateRelationship(
+            nextRelationships,
+            r.characterId,
+            NFT_CONFIG.sculptorReactionDelta,
+          )
+        } else if (r.factionAlignment === 'social_political') {
+          nextRelationships = updateRelationship(
+            nextRelationships,
+            r.characterId,
+            NFT_CONFIG.socialPoliticalReactionDelta,
+          )
+          socialPoliticalHit = true
+        }
+      }
+      next = { ...next, relationships: nextRelationships }
+      this.state.playerSim[sessionId] = next
+
+      await this.persist()
+      this.broadcastStateSecure()
+      sender.send(JSON.stringify({ type: 'YOUR_SIM_STATE', simState: this.state.playerSim[sessionId] }))
+
+      if (socialPoliticalHit) {
+        const copy = NFT_CONFIG.denouncementCopyTemplate.replace('{name}', session.name)
+        this.room.broadcast(
+          JSON.stringify({
+            type: 'NFT_DENOUNCEMENT',
+            sessionId,
+            displayName: session.name,
+            copy,
+          }),
+        )
+      }
+      return
+    }
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -722,6 +886,14 @@ export default class GameServer implements Party.Server {
       // derived from engine output, not trusted client input).
       const updatedPlayerSimMap: Record<string, PlayerSimState> = {}
       const contactedByPlayer = new Map<string, Set<string>>()
+      // Phase 5 Plan 01: capture each player's coolness BEFORE resolveSlots
+      // so the threshold-cross detector below can compare prior vs current
+      // and flip nftWalletUnlocked exactly once per player.
+      const priorCoolnessBySession = new Map<string, number>()
+      for (const p of players) {
+        const ps = this.state.playerSim[p.sessionId]
+        if (ps) priorCoolnessBySession.set(p.sessionId, ps.coolness)
+      }
       // Phase 4 Plan 03: capture per-player day plan BEFORE resolveSlots
       // clears scheduledSlots, so the acquisition/use passes below can
       // re-inspect the plan for flatlands/hotel/party slots.
@@ -804,6 +976,32 @@ export default class GameServer implements Party.Server {
         updatedPlayers[i] = { ...updatedPlayers[i], coolness: coolnessMirror }
       }
 
+      // ── Phase 5 Plan 01: Coolness threshold-cross detector ───────────
+      //
+      // After drug-use bumps coolness (the highest coolness moment in the
+      // day), check whether any player's coolness crossed NFT_CONFIG.unlock
+      // Threshold from below. If so, flip nftWalletUnlocked once and
+      // dispatch an NFT_DM unicast to that player's connection. The bit
+      // can ONLY be set here (T-5-05 mitigation) — no inbound message can
+      // flip it.
+      for (const p of players) {
+        const ps = updatedPlayerSimMap[p.sessionId]
+        if (!ps) continue
+        if (ps.nftWalletUnlocked) continue
+        const prior = priorCoolnessBySession.get(p.sessionId) ?? ps.coolness
+        if (prior < NFT_CONFIG.unlockThreshold && ps.coolness >= NFT_CONFIG.unlockThreshold) {
+          updatedPlayerSimMap[p.sessionId] = { ...ps, nftWalletUnlocked: true }
+          // Unicast NFT_DM to the connection whose conn.id === sessionId
+          // (T-5-07 mitigation). Mirrors the broadcastSimStatePrivate iteration.
+          for (const conn of this.room.getConnections()) {
+            if (conn.id === p.sessionId) {
+              conn.send(JSON.stringify({ type: 'NFT_DM', copy: NFT_CONFIG.dmCopy }))
+              break
+            }
+          }
+        }
+      }
+
       // Phase 4 Plan 02: landlord arc progression. Runs per player AFTER
       // the resolveSlots loop but BEFORE advanceDay, so the landlordStage
       // advance is visible in the same sim_day → auction_round transition
@@ -831,13 +1029,15 @@ export default class GameServer implements Party.Server {
         updatedPlayerSimMap[p.sessionId] = accumulateRisk(ps)
       }
 
-      // Advance global sim state. Drift is deterministically zero for now;
-      // a seeded PRNG will own this in a follow-up plan. Decay is per-player
-      // against the contact set built above.
+      // Advance global sim state. Phase 5 Plan 01 wires applyNftHypeDrift
+      // into the nft drift parameter — Math.random stays here (entropy
+      // boundary, T-5-09); the engine receives the post-clamp delta.
+      const nftRandomDelta = (Math.random() * 2 - 1) * NFT_CONFIG.hypeDriftRange
+      const nextHype = applyNftHypeDrift(sim.nftHypeCycle, nftRandomDelta)
       const { updatedSim, updatedPlayerSims } = advanceDay(
         sim,
         Object.values(updatedPlayerSimMap),
-        { hotness: 0, gent: 0, nft: 0 },
+        { hotness: 0, gent: 0, nft: nextHype - sim.nftHypeCycle },
         contactedByPlayer,
       )
       this.state.sim = updatedSim
