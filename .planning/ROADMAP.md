@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Security fixes: derivePublicState, deck strip, host assignment, double-auction faithful rules, reconnect round summary
+- [x] 01-01-PLAN.md — Security fixes: derivePublicState, deck strip, host assignment, double-auction faithful rules, reconnect round summary
 - [ ] 01-02-PLAN.md — Input validation (Zod 4), startGame consolidation, Supabase/dead code removal, sealed bid tie-breaking fix
 - [ ] 01-03-PLAN.md — Engine tests (Vitest 4): all five auction types, round-end trigger, tie-breaking, cumulative valuation, pass cycle
 

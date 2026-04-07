@@ -7,15 +7,15 @@
 
 ### Engine — Hardening & Security
 
-- [ ] **ENG-01**: Sealed bid amounts are hidden from all players until the reveal phase (not exposed in WebSocket broadcast)
-- [ ] **ENG-02**: Deck cards are excluded from public GameState broadcast (server-only; clients only see their own hand)
-- [ ] **ENG-03**: Only the auctioneer player can play the second card in a double auction
-- [ ] **ENG-04**: Host status is assigned server-side by connection order (not trusted from client JOIN message)
+- [x] **ENG-01**: Sealed bid amounts are hidden from all players until the reveal phase (not exposed in WebSocket broadcast)
+- [x] **ENG-02**: Deck cards are excluded from public GameState broadcast (server-only; clients only see their own hand)
+- [x] **ENG-03**: Only the auctioneer player can play the second card in a double auction
+- [x] **ENG-04**: Host status is assigned server-side by connection order (not trusted from client JOIN message)
 - [ ] **ENG-05**: All inbound WebSocket messages are validated by Zod schemas before reaching engine functions
 - [ ] **ENG-06**: `startGame` logic lives in the engine function, not duplicated inline in the server
 - [ ] **ENG-07**: Dead Supabase module (`src/lib/supabase.ts`), orphaned SQL files, and unused `zustand` dependency are removed
 - [ ] **ENG-08**: Round-end trigger fires when the 5th painting of any artist is put up for auction (not after auction resolves)
-- [ ] **ENG-09**: A reconnecting player receives the last round summary state (not lost on WebSocket reconnect)
+- [x] **ENG-09**: A reconnecting player receives the last round summary state (not lost on WebSocket reconnect)
 - [ ] **ENG-10**: Engine has unit tests covering all five auction types, cumulative valuation, round-end trigger, and sealed-bid tie-breaking
 
 ### Aesthetic System
@@ -122,15 +122,15 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ENG-01 | Phase 1 — Engine Hardening & Security | Pending |
-| ENG-02 | Phase 1 — Engine Hardening & Security | Pending |
-| ENG-03 | Phase 1 — Engine Hardening & Security | Pending |
-| ENG-04 | Phase 1 — Engine Hardening & Security | Pending |
+| ENG-01 | Phase 1 — Engine Hardening & Security | Complete |
+| ENG-02 | Phase 1 — Engine Hardening & Security | Complete |
+| ENG-03 | Phase 1 — Engine Hardening & Security | Complete |
+| ENG-04 | Phase 1 — Engine Hardening & Security | Complete |
 | ENG-05 | Phase 1 — Engine Hardening & Security | Pending |
 | ENG-06 | Phase 1 — Engine Hardening & Security | Pending |
 | ENG-07 | Phase 1 — Engine Hardening & Security | Pending |
 | ENG-08 | Phase 1 — Engine Hardening & Security | Pending |
-| ENG-09 | Phase 1 — Engine Hardening & Security | Pending |
+| ENG-09 | Phase 1 — Engine Hardening & Security | Complete |
 | ENG-10 | Phase 1 — Engine Hardening & Security | Pending |
 | AEST-01 | Phase 2 — Aesthetic System Foundation | Pending |
 | AEST-02 | Phase 2 — Aesthetic System Foundation | Pending |
