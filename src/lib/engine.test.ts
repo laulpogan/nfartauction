@@ -48,7 +48,17 @@ function makeGame(playerCount: number): { game: GameState; players: PlayerRecord
       paintingCount: 0,
       paintings: p.paintings,
       isHost: p.isHost,
+      coolness: 0,
+      prestige: 0,
     })),
+    phase: { type: 'lobby' },
+    sim: {
+      dayNumber: 0,
+      artMarketHotness: 1.0,
+      gentrificationLevel: 3,
+      nftHypeCycle: 30,
+      neighborhoods: ['gallery', 'warehouse', 'flatlands', 'hotel', 'online'],
+    },
   }
   return { game, players }
 }

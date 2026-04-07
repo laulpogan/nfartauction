@@ -64,10 +64,18 @@ function makeFixture(type: AuctionType, auctionOverrides: Partial<AuctionState> 
     deck: [],
     auction: makeAuction(type, auctionOverrides),
     players: [
-      { id: 'p0', sessionId: 's0', displayName: 'Alice', position: 0, money: 100000, paintingCount: 0, paintings: [], isHost: true },
-      { id: 'p1', sessionId: 's1', displayName: 'Bob',   position: 1, money: 100000, paintingCount: 0, paintings: [], isHost: false },
-      { id: 'p2', sessionId: 's2', displayName: 'Carol', position: 2, money: 100000, paintingCount: 0, paintings: [], isHost: false },
+      { id: 'p0', sessionId: 's0', displayName: 'Alice', position: 0, money: 100000, paintingCount: 0, paintings: [], isHost: true,  coolness: 0, prestige: 0 },
+      { id: 'p1', sessionId: 's1', displayName: 'Bob',   position: 1, money: 100000, paintingCount: 0, paintings: [], isHost: false, coolness: 0, prestige: 0 },
+      { id: 'p2', sessionId: 's2', displayName: 'Carol', position: 2, money: 100000, paintingCount: 0, paintings: [], isHost: false, coolness: 0, prestige: 0 },
     ],
+    phase: { type: 'lobby' },
+    sim: {
+      dayNumber: 0,
+      artMarketHotness: 1.0,
+      gentrificationLevel: 3,
+      nftHypeCycle: 30,
+      neighborhoods: ['gallery', 'warehouse', 'flatlands', 'hotel', 'online'],
+    },
   }
 }
 

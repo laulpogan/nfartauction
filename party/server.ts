@@ -11,6 +11,7 @@ import {
   passFixedPrice, placeOpenBid, endOpenAuction, placeOnceAroundBid,
   submitSealedBid, endRound, startGame,
 } from '../src/lib/engine'
+import { createInitialSimState } from '../src/lib/sim-config'
 import type { PlayerRecord } from '../src/types/game'
 
 // ─── Inbound message schema (ENG-05) ──────────────────────────────────────────
@@ -82,6 +83,10 @@ function sessionToPublicPlayer(session: Session): GameState['players'][0] {
     paintingCount: session.paintings.length,
     paintings: session.paintings,
     isHost: session.isHost,
+    // Phase 3 sim-loop public mirror fields. Real values will be projected
+    // from PlayerSimState by sim-engine in 03-02; lobby default is 0.
+    coolness: 0,
+    prestige: 0,
   }
 }
 
@@ -187,6 +192,9 @@ export default class GameServer implements Party.Server {
           deck: [],
           auction: null,
           players: [sessionToPublicPlayer(session)],
+          // Phase 3: lobby default for the sim-loop fields.
+          phase: { type: 'lobby' },
+          sim: createInitialSimState(),
         }
 
         this.state = {

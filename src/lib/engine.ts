@@ -18,6 +18,12 @@ export function makePublicPlayer(p: PlayerRecord): PublicPlayer {
     paintingCount: p.paintings.length,
     paintings: p.paintings,
     isHost: p.isHost,
+    // Phase 3 sim-loop public mirror fields. Real values are owned by
+    // sim-engine and projected onto the public player record by the server
+    // when sim state changes. The defaults here keep lobby-time construction
+    // honest before any sim day has run.
+    coolness: 0,
+    prestige: 0,
   }
 }
 

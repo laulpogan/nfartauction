@@ -1,3 +1,7 @@
+// Re-export Neighborhood so sim consumers can pull it from a single types module.
+export type { Neighborhood } from '../contexts/NeighborhoodContext'
+import type { Neighborhood } from '../contexts/NeighborhoodContext'
+
 export type Artist = 'lite_metal' | 'yoko' | 'christine_p' | 'karl_gitter' | 'krypto'
 
 export type AuctionType = 'open' | 'once_around' | 'sealed_bid' | 'fixed_price' | 'double'
@@ -25,6 +29,10 @@ export interface PublicPlayer {
   paintingCount: number
   paintings: { artist: Artist; round: number }[]
   isHost: boolean
+  // Sim public mirror fields — opponents are allowed to see these.
+  // Private sim state lives in the per-connection PlayerSimState channel.
+  coolness: number
+  prestige: number
 }
 
 export interface AuctionState {
@@ -63,6 +71,12 @@ export interface GameState {
   deck: Card[]                         // server keeps deck here
   auction: AuctionState | null
   players: PublicPlayer[]
+  // Phase 3 sim-loop additions. The phase discriminated union drives the
+  // alternating sim_day ↔ auction_round flow; SimState is the public global
+  // sim snapshot. Per-player private sim state lives server-side and is sent
+  // to its owning connection via YOUR_SIM_STATE.
+  phase: GamePhase
+  sim: SimState
 }
 
 // Public projection types — what clients are allowed to see.
@@ -132,3 +146,87 @@ export const HAND_DISTRIBUTION: Record<number, { initial: number; extra: number[
 }
 
 export const ROUND_END_THRESHOLD = 5  // 5th painting of any artist ends the round
+
+// ─── Phase 3: Sim Loop Types ────────────────────────────────────────────────
+//
+// These types define the contract for the gallery sim layer. The phase
+// discriminated union drives the alternating sim_day ↔ auction_round loop.
+// PlayerSimState is private (server → owning connection only); SimState is
+// public and broadcast in GameState.
+
+export type GamePhase =
+  | { type: 'lobby' }
+  | { type: 'sim_day'; dayNumber: number; submittedSessionIds: string[] }
+  | { type: 'auction_round'; roundNumber: number }
+  | { type: 'game_over' }
+
+export type SlotType =
+  | 'gallery_work'
+  | 'studio_visits'
+  | 'art_fair'
+  | 'opening'
+  | 'party'
+  | 'sleep'
+
+export interface TimeSlot {
+  id: string
+  type: SlotType
+  neighborhood: Neighborhood | null
+}
+
+// Per-slot stat deltas. Money is included so the dev transaction log can
+// surface the full effect of a slot in one event payload.
+export interface PlayerStats {
+  money: number
+  coolness: number
+  restedness: number
+  luck: number
+}
+
+export interface SimEvent {
+  kind: string
+  description: string
+  statDeltas: Partial<Record<keyof PlayerStats, number>>
+}
+
+export interface PlayerSimState {
+  sessionId: string
+  coolness: number
+  restedness: number
+  luck: number
+  currentNeighborhood: Neighborhood
+  scheduledSlots: TimeSlot[]
+  // Phase 4 stubs — present as types but inert this phase. The privacy model
+  // demands these fields exist now so the server channel boundary is correct
+  // before the mechanics land.
+  drugInventory: never[]
+  relationships: never[]
+  faction: null
+}
+
+export interface SimState {
+  dayNumber: number
+  artMarketHotness: number     // 0.5–2.0 multiplier
+  gentrificationLevel: number  // 1–10 integer
+  nftHypeCycle: number         // 0–100
+  neighborhoods: Neighborhood[]
+}
+
+// ─── Sim Message Payloads ───────────────────────────────────────────────────
+// These are the message-shaped types that 03-02 will wire into the Zod
+// inbound/outbound discriminated unions.
+
+export interface SubmitSlotsPayload {
+  slots: TimeSlot[]
+}
+
+export interface YourSimStateMessage {
+  type: 'YOUR_SIM_STATE'
+  simState: PlayerSimState
+}
+
+export interface SimDayResultMessage {
+  type: 'SIM_DAY_RESULT'
+  dayNumber: number
+  events: SimEvent[]
+}
