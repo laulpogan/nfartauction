@@ -342,6 +342,45 @@ export interface SimState {
 // These are the message-shaped types that 03-02 will wire into the Zod
 // inbound/outbound discriminated unions.
 
+// ─── Phase 5 Plan 02: End-state appraisal ──────────────────────────────────
+
+/**
+ * FinalAppraisal is the per-player summary computed when the game transitions
+ * to game_over after the round-4 auction resolves. Aggregates the entire
+ * game's sim history into a printed document: faction mix, neighborhoods
+ * visited, NFT exposure depth, top-3 key relationships, rounds spent in
+ * flatlands, and a three-sentence templated epitaph.
+ *
+ * Computed by computeFinalAppraisal in sim-engine.ts (pure). The server
+ * supplies neighborhoodHistory from a server-only Record kept on ServerState
+ * (see party/server.ts). Broadcast to all players via GAME_OVER_APPRAISALS.
+ */
+export interface FinalAppraisal {
+  sessionId: string
+  displayName: string
+  finalMoney: number
+  factionMix: Record<Faction, number>
+  dominantFaction: Faction | null
+  neighborhoodsVisited: Neighborhood[]
+  roundsInFlatlands: number
+  nftExposure: {
+    heldCount: number
+    walletBalance: number
+    unlocked: boolean
+  }
+  keyRelationships: {
+    displayName: string
+    score: number
+    status: 'kept' | 'cold' | 'dropped'
+  }[]
+  threeSentenceEpitaph: string
+}
+
+export interface GameOverAppraisalsMessage {
+  type: 'GAME_OVER_APPRAISALS'
+  appraisals: Record<string, FinalAppraisal>
+}
+
 export interface SubmitSlotsPayload {
   slots: TimeSlot[]
 }

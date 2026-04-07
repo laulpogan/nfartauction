@@ -21,6 +21,7 @@ import {
   purchaseNftWhitelist,
   applyNftHypeDrift,
   computeNftExchangeRate,
+  computeFinalAppraisal,
   RELATIONSHIP_CONFIG,
   LANDLORD_CONFIG,
   LANDLORD_MESSAGES,
@@ -797,5 +798,218 @@ describe('NFT system', () => {
       purchaseNftWhitelist(ps, null)
       expect(ps).toEqual(snapshot)
     })
+  })
+})
+
+// ─── Phase 5 Plan 02: End-state appraisal ─────────────────────────────────
+
+describe('End-state appraisal', () => {
+  function makeAppraisalSim(overrides: Partial<PlayerSimState> = {}): PlayerSimState {
+    return { ...createInitialPlayerSimState('s0'), ...overrides }
+  }
+
+  it('returns a FinalAppraisal with all top-level fields populated', () => {
+    const ps = makeAppraisalSim()
+    const out = computeFinalAppraisal({
+      sessionId: 's0',
+      displayName: 'Alice',
+      finalMoney: 12345,
+      playerSim: ps,
+      neighborhoodHistory: ['gallery'],
+    })
+    expect(out.sessionId).toBe('s0')
+    expect(out.displayName).toBe('Alice')
+    expect(out.finalMoney).toBe(12345)
+    expect(out.factionMix).toBeDefined()
+    expect(out.neighborhoodsVisited).toEqual(['gallery'])
+    expect(out.roundsInFlatlands).toBe(0)
+    expect(out.nftExposure).toBeDefined()
+    expect(out.keyRelationships).toHaveLength(3)
+    expect(typeof out.threeSentenceEpitaph).toBe('string')
+  })
+
+  it('selects dominantFaction as the argmax over factionMix', () => {
+    // Boost painters by updating Helena V. (painters collector) to 100.
+    let relationships = createInitialPlayerSimState('s0').relationships
+    relationships = updateRelationship(relationships, 'collector:helena_v', 50)
+    const ps = makeAppraisalSim({ relationships })
+    const out = computeFinalAppraisal({
+      sessionId: 's0',
+      displayName: 'Alice',
+      finalMoney: 0,
+      playerSim: ps,
+      neighborhoodHistory: [],
+    })
+    expect(out.dominantFaction).toBe('painters')
+  })
+
+  it('returns null dominantFaction when all faction totals are zero', () => {
+    // Zero out every relationship score so factionMix is all zeros.
+    const relationships = createInitialPlayerSimState('s0').relationships.map(r => ({
+      ...r,
+      score: 0,
+    }))
+    const ps = makeAppraisalSim({ relationships })
+    const out = computeFinalAppraisal({
+      sessionId: 's0',
+      displayName: 'Alice',
+      finalMoney: 0,
+      playerSim: ps,
+      neighborhoodHistory: [],
+    })
+    expect(out.dominantFaction).toBeNull()
+  })
+
+  it('dedupes neighborhoodsVisited preserving first-seen order', () => {
+    const ps = makeAppraisalSim()
+    const out = computeFinalAppraisal({
+      sessionId: 's0',
+      displayName: 'Alice',
+      finalMoney: 0,
+      playerSim: ps,
+      neighborhoodHistory: ['gallery', 'flatlands', 'gallery', 'warehouse', 'flatlands'],
+    })
+    expect(out.neighborhoodsVisited).toEqual(['gallery', 'flatlands', 'warehouse'])
+  })
+
+  it('counts roundsInFlatlands across the history', () => {
+    const ps = makeAppraisalSim()
+    const out = computeFinalAppraisal({
+      sessionId: 's0',
+      displayName: 'Alice',
+      finalMoney: 0,
+      playerSim: ps,
+      neighborhoodHistory: ['flatlands', 'gallery', 'flatlands', 'flatlands', 'hotel'],
+    })
+    expect(out.roundsInFlatlands).toBe(3)
+  })
+
+  it('sorts keyRelationships by absolute score and maps status correctly', () => {
+    // Craft 3 relationships: one kept (score 80), one cold (score 10),
+    // one dropped (score -50 via isDroppedArtist seed).
+    let relationships = createInitialPlayerSimState('s0').relationships.map(r => ({
+      ...r,
+      score: 0,
+    }))
+    relationships = updateRelationship(relationships, 'collector:helena_v', 80)
+    relationships = updateRelationship(relationships, 'collector:bram_k', 10)
+    relationships = relationships.map(r =>
+      r.characterId === 'artist:lite_metal'
+        ? { ...r, score: RELATIONSHIP_CONFIG.droppedSeedScore, isDroppedArtist: true }
+        : r,
+    )
+    const ps = makeAppraisalSim({ relationships })
+    const out = computeFinalAppraisal({
+      sessionId: 's0',
+      displayName: 'Alice',
+      finalMoney: 0,
+      playerSim: ps,
+      neighborhoodHistory: [],
+    })
+    expect(out.keyRelationships).toHaveLength(3)
+    // First is abs-highest; dropped artist at -50 beats 80? abs(80)=80, abs(-50)=50
+    // So Helena (80) first, lite_metal (-50) second, Bram (10) third.
+    expect(out.keyRelationships[0].score).toBe(80)
+    expect(out.keyRelationships[0].status).toBe('kept')
+    expect(out.keyRelationships[1].score).toBe(-50)
+    expect(out.keyRelationships[1].status).toBe('dropped')
+    expect(out.keyRelationships[2].score).toBe(10)
+    expect(out.keyRelationships[2].status).toBe('cold')
+  })
+
+  it('passes through nftExposure from playerSim', () => {
+    const item: import('../types/game').NftItem = {
+      id: 'n1',
+      rarity: 'rare',
+      displayLabel: 'L',
+      displayMeta: 'M',
+      baseValue: 10,
+    }
+    const ps = makeAppraisalSim({
+      nftWallet: 7,
+      nftWalletUnlocked: true,
+      heldNfts: [item, item, item],
+    })
+    const out = computeFinalAppraisal({
+      sessionId: 's0',
+      displayName: 'Alice',
+      finalMoney: 0,
+      playerSim: ps,
+      neighborhoodHistory: [],
+    })
+    expect(out.nftExposure).toEqual({ heldCount: 3, walletBalance: 7, unlocked: true })
+  })
+
+  it('produces an epitaph with exactly three sentences ending in a period', () => {
+    const ps = makeAppraisalSim()
+    const out = computeFinalAppraisal({
+      sessionId: 's0',
+      displayName: 'Alice',
+      finalMoney: 0,
+      playerSim: ps,
+      neighborhoodHistory: [],
+    })
+    // Count sentences by trailing-period segments. Our templates end each
+    // clause with a single period, so splitting on '. ' should give 3 parts.
+    const trimmed = out.threeSentenceEpitaph.trim()
+    expect(trimmed.endsWith('.')).toBe(true)
+    const segments = trimmed.split(/\. (?=[a-z{])/)
+    expect(segments.length).toBe(3)
+  })
+
+  it('epitaph reflects the selected clause keys (deep_chain + flatlands_native)', () => {
+    const item: import('../types/game').NftItem = {
+      id: 'n1',
+      rarity: 'legendary',
+      displayLabel: 'L',
+      displayMeta: 'M',
+      baseValue: 25,
+    }
+    const ps = makeAppraisalSim({ heldNfts: [item, item, item, item] })
+    const out = computeFinalAppraisal({
+      sessionId: 's0',
+      displayName: 'Alice',
+      finalMoney: 0,
+      playerSim: ps,
+      neighborhoodHistory: ['flatlands', 'flatlands', 'flatlands', 'flatlands'],
+    })
+    // deep_chain template[0]: 'the chain position grew into a second inventory.'
+    expect(out.threeSentenceEpitaph).toContain('chain position grew')
+    // flatlands_native template[0]: 'the flatlands kept appearing in the travel log...'
+    expect(out.threeSentenceEpitaph).toContain('flatlands kept appearing')
+  })
+
+  it('epitaph interpolates {name} for templates that include it (sculptors dominant)', () => {
+    // Make sculptors dominant: Bram K is a sculptor collector (score 50);
+    // zero everyone else so Bram wins.
+    const relationships = createInitialPlayerSimState('s0').relationships.map(r =>
+      r.characterId === 'collector:bram_k' ? r : { ...r, score: 0 },
+    )
+    const ps = makeAppraisalSim({ relationships })
+    const out = computeFinalAppraisal({
+      sessionId: 's0',
+      displayName: 'Margot',
+      finalMoney: 0,
+      playerSim: ps,
+      neighborhoodHistory: [],
+    })
+    // sculptors template[0] contains {name}: 'Margot kept the sculptors close...'
+    expect(out.threeSentenceEpitaph).toContain('Margot')
+  })
+
+  it('is pure: does not mutate playerSim or neighborhoodHistory', () => {
+    const ps = makeAppraisalSim({ nftWallet: 3 })
+    const history: import('../types/game').Neighborhood[] = ['gallery', 'flatlands']
+    const psSnapshot = JSON.parse(JSON.stringify(ps))
+    const historySnapshot = [...history]
+    computeFinalAppraisal({
+      sessionId: 's0',
+      displayName: 'Alice',
+      finalMoney: 0,
+      playerSim: ps,
+      neighborhoodHistory: history,
+    })
+    expect(ps).toEqual(psSnapshot)
+    expect(history).toEqual(historySnapshot)
   })
 })

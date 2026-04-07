@@ -31,6 +31,8 @@ import type {
   DrugItemKind,
   PlayerStats,
   NftItem,
+  Neighborhood,
+  FinalAppraisal,
 } from '../types/game'
 import {
   SLOT_DEFINITIONS,
@@ -41,6 +43,7 @@ import {
   DRUG_DEFINITIONS,
   NFT_CONFIG,
   NFT_ITEM_DEFINITIONS,
+  APPRAISAL_TEMPLATES,
 } from './sim-config'
 
 export interface ResolveSlotsResult {
@@ -589,6 +592,118 @@ export function computeNftExchangeRate(nftHypeCycle: number): number {
   return 0.5 + (nftHypeCycle / 100) * 1.5
 }
 
+// ─── Phase 5 Plan 02: End-state appraisal pure function ──────────────────
+
+/**
+ * Compute a per-player FinalAppraisal from the complete sim history. Pure:
+ * no Math.random / Date.now / console. The server is responsible for
+ * supplying neighborhoodHistory (a server-only append-only log kept on
+ * ServerState outside the engine) and for broadcasting the result.
+ *
+ * Clause selection is deterministic (index 0 of each template bucket) — the
+ * entropy boundary lives in the caller, not here.
+ *
+ *   - dominantFaction: argmax over the derived factionMix; null when zero.
+ *   - neighborhoodsVisited: first-seen-order dedupe of the history.
+ *   - roundsInFlatlands: count of 'flatlands' entries in the history.
+ *   - keyRelationships: top 3 by abs(score), mapped to kept|cold|dropped.
+ *   - threeSentenceEpitaph: three clauses joined with a single space, chosen
+ *     from APPRAISAL_TEMPLATES by faction / nft exposure / flatlands bucket.
+ *     {name} tokens are replaced with the player's displayName.
+ */
+export function computeFinalAppraisal(args: {
+  sessionId: string
+  displayName: string
+  finalMoney: number
+  playerSim: PlayerSimState
+  neighborhoodHistory: Neighborhood[]
+}): FinalAppraisal {
+  const { sessionId, displayName, finalMoney, playerSim, neighborhoodHistory } = args
+
+  // Faction mix (re-uses deriveFactionAlignment).
+  const factionMix = deriveFactionAlignment(playerSim.relationships)
+  let dominantFaction: Faction | null = null
+  let maxTotal = 0
+  ;(Object.keys(factionMix) as Faction[]).forEach(f => {
+    if (factionMix[f] > maxTotal) {
+      maxTotal = factionMix[f]
+      dominantFaction = f
+    }
+  })
+
+  // Neighborhoods visited: first-seen-order dedupe.
+  const seen = new Set<Neighborhood>()
+  const neighborhoodsVisited: Neighborhood[] = []
+  for (const n of neighborhoodHistory) {
+    if (!seen.has(n)) {
+      seen.add(n)
+      neighborhoodsVisited.push(n)
+    }
+  }
+
+  const roundsInFlatlands = neighborhoodHistory.filter(n => n === 'flatlands').length
+
+  const nftExposure = {
+    heldCount: playerSim.heldNfts.length,
+    walletBalance: playerSim.nftWallet,
+    unlocked: playerSim.nftWalletUnlocked,
+  }
+
+  // Key relationships: top 3 by absolute score magnitude.
+  const sortedRels = [...playerSim.relationships].sort(
+    (a, b) => Math.abs(b.score) - Math.abs(a.score),
+  )
+  const keyRelationships = sortedRels.slice(0, 3).map(r => {
+    let status: 'kept' | 'cold' | 'dropped'
+    if (r.score < 0) status = 'dropped'
+    else if (r.score < RELATIONSHIP_CONFIG.coldThreshold) status = 'cold'
+    else status = 'kept'
+    return { displayName: r.displayName, score: r.score, status }
+  })
+
+  // Clause selection.
+  const factionKey = dominantFaction === null ? 'faction:undeclared' : `faction:${dominantFaction}`
+  const nftBucket =
+    nftExposure.heldCount === 0
+      ? 'nft:no_chain'
+      : nftExposure.heldCount <= 2
+        ? 'nft:casual_chain'
+        : 'nft:deep_chain'
+  const flatlandsBucket =
+    roundsInFlatlands === 0
+      ? 'flatlands:never_flatlands'
+      : roundsInFlatlands <= 2
+        ? 'flatlands:occasional_flatlands'
+        : 'flatlands:flatlands_native'
+
+  const pick = (key: string): string => {
+    const bucket = APPRAISAL_TEMPLATES[key]
+    if (!bucket || bucket.length === 0) return ''
+    return bucket[0].replace('{name}', displayName)
+  }
+
+  const threeSentenceEpitaph = [
+    pick(factionKey),
+    pick(nftBucket),
+    pick(flatlandsBucket),
+  ]
+    .filter(s => s.length > 0)
+    .join(' ')
+
+  return {
+    sessionId,
+    displayName,
+    finalMoney,
+    factionMix,
+    dominantFaction,
+    neighborhoodsVisited,
+    roundsInFlatlands,
+    nftExposure,
+    keyRelationships,
+    threeSentenceEpitaph,
+  }
+}
+
 export interface AuctionModifiers {
   bidCeilingMultiplier: number
   luckRoll: number
@@ -632,6 +747,8 @@ export {
   DRUG_DEFINITIONS,
   NFT_CONFIG,
   NFT_ITEM_DEFINITIONS,
+  APPRAISAL_TEMPLATES,
+  APPRAISAL_HEADER,
 } from './sim-config'
 
 function clamp(n: number, lo: number, hi: number): number {

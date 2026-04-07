@@ -313,6 +313,75 @@ export const NFT_ITEM_DEFINITIONS: Record<NftRarity, {
   legendary: { displayLabel: 'Crown (1/1)',             displayMeta: 'on-chain generative, 2024', baseValue: 25 },
 }
 
+// ─── Phase 5 Plan 02: End-state appraisal ──────────────────────────────────
+
+/**
+ * Header used as the printed-appraisal subheader. {gallery} is interpolated
+ * at render time (EndStateAppraisal.tsx uses the local player's displayName
+ * as the gallery name — "Printed Appraisal — Estate of [YOUR NAME]").
+ */
+export const APPRAISAL_HEADER = 'PRINTED APPRAISAL — ESTATE OF {gallery}'
+
+/**
+ * Templated clauses for the three-sentence epitaph. Keyed by clause kind,
+ * each entry holds 2-3 alternative phrasings in zine register — no
+ * exclamation marks, no marketing copy. computeFinalAppraisal picks index 0
+ * deterministically (entropy, if needed, lives in the server caller).
+ *
+ * Clause keys — 12 total, grouped in three axes:
+ *   faction:{painters|sculptors|video_art|social_political|undeclared}
+ *   nft:{no_chain|casual_chain|deep_chain}
+ *   flatlands:{never_flatlands|occasional_flatlands|flatlands_native}
+ *
+ * {name} is interpolated with the player's displayName at select sites.
+ */
+export const APPRAISAL_TEMPLATES: Record<string, string[]> = {
+  'faction:painters': [
+    'the gallery sided with the painters; the wall labels say so.',
+    'paintings outnumbered everything else on the appraisal forms.',
+  ],
+  'faction:sculptors': [
+    '{name} kept the sculptors close; the courtyards remember.',
+    'the heavy materials stayed in the rotation through the last round.',
+  ],
+  'faction:video_art': [
+    'the video artists held the late-night slot and never gave it back.',
+    'single-channel loops ran under every conversation that mattered.',
+  ],
+  'faction:social_political': [
+    '{name} ran with the social-political cohort; the press releases were long.',
+    'the denouncements were filed and the denouncements were kept.',
+  ],
+  'faction:undeclared': [
+    'no faction could claim the gallery as theirs.',
+    'the alignment pages were left blank on the appraisal.',
+  ],
+  'nft:no_chain': [
+    'no on-chain exposure was recorded in the holdings ledger.',
+    'the NFT wallet stayed closed for the duration.',
+  ],
+  'nft:casual_chain': [
+    'a small chain position was noted but never grew.',
+    'the wallet held a handful of editions, nothing more.',
+  ],
+  'nft:deep_chain': [
+    'the chain position grew into a second inventory.',
+    'a deep holdings list shadows the painting collection.',
+  ],
+  'flatlands:never_flatlands': [
+    'the flatlands were never on the itinerary.',
+    'the gallery-district address held through every round.',
+  ],
+  'flatlands:occasional_flatlands': [
+    'the flatlands came up a handful of times, no more.',
+    'a few flatlands detours are listed in the travel log.',
+  ],
+  'flatlands:flatlands_native': [
+    'the flatlands kept appearing in the travel log until it read as home.',
+    'by the fourth round, the flatlands were the default address.',
+  ],
+}
+
 // Dev-mode transaction log. Production builds drop this entirely via the
 // import.meta.env.DEV branch elimination Vite performs at build time.
 export function logSimTransaction(event: SimEvent, sessionId: string): void {
