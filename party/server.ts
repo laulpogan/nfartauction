@@ -1,4 +1,5 @@
 import type * as Party from 'partykit/server'
+import { z } from 'zod'
 import type {
   GameState, Card, Artist, RoundResult,
   PublicGameState, PublicAuctionState,
@@ -12,6 +13,32 @@ import {
 } from '../src/lib/engine'
 import { buildDeck, shuffle, dealHands } from '../src/lib/deck'
 import type { PlayerRecord } from '../src/types/game'
+
+// ─── Inbound message schema (ENG-05) ──────────────────────────────────────────
+
+const ArtistSchema = z.enum(['lite_metal', 'yoko', 'christine_p', 'karl_gitter', 'krypto'])
+const AuctionTypeSchema = z.enum(['open', 'once_around', 'sealed_bid', 'fixed_price', 'double'])
+const CardSchema = z.object({
+  id: z.string(),
+  artist: ArtistSchema,
+  auctionType: AuctionTypeSchema,
+})
+
+const InboundMessage = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('JOIN'), name: z.string().min(1).max(30).regex(/^[\x20-\x7E]+$/), isHost: z.boolean().optional() }),
+  z.object({ type: z.literal('START_GAME') }),
+  z.object({ type: z.literal('PLAY_CARD'), card: CardSchema }),
+  z.object({ type: z.literal('PLAY_SECOND_CARD'), card: CardSchema }),
+  z.object({ type: z.literal('PASS_SECOND_CARD') }),
+  z.object({ type: z.literal('SET_FIXED_PRICE'), price: z.number().int().min(0) }),
+  z.object({ type: z.literal('ACCEPT_FIXED_PRICE') }),
+  z.object({ type: z.literal('PASS_FIXED_PRICE') }),
+  z.object({ type: z.literal('PLACE_OPEN_BID'), amount: z.number().int().min(1) }),
+  z.object({ type: z.literal('END_OPEN_AUCTION') }),
+  z.object({ type: z.literal('PLACE_ONCE_AROUND_BID'), amount: z.number().int().min(0).nullable() }),
+  z.object({ type: z.literal('SUBMIT_SEALED_BID'), amount: z.number().int().min(0) }),
+])
+type InboundMessage = z.infer<typeof InboundMessage>
 
 // ─── Server state ─────────────────────────────────────────────────────────────
 
@@ -36,7 +63,6 @@ interface ServerState {
 function buildPlayerRecord(session: Session, hand: Card[]): PlayerRecord {
   return {
     id: session.sessionId,
-    gameId: '',
     sessionId: session.sessionId,
     displayName: session.name,
     position: session.position,
@@ -120,20 +146,28 @@ export default class GameServer implements Party.Server {
   }
 
   async onMessage(message: string, sender: Party.Connection) {
-    const msg = JSON.parse(message)
+    let raw: unknown
+    try { raw = JSON.parse(message) } catch { return }  // malformed JSON — drop silently
+
+    const result = InboundMessage.safeParse(raw)
+    if (!result.success) {
+      sender.send(JSON.stringify({ type: 'ERROR', message: 'Invalid message' }))
+      return
+    }
+
     try {
-      await this.handleMessage(msg, sender)
+      await this.handleMessage(result.data, sender)
     } catch (e) {
       sender.send(JSON.stringify({ type: 'ERROR', message: String(e) }))
     }
   }
 
-  private async handleMessage(msg: Record<string, unknown>, sender: Party.Connection) {
+  private async handleMessage(msg: InboundMessage, sender: Party.Connection) {
     const sessionId = sender.id as string
 
     // ── JOIN ────────────────────────────────────────────────────────────────
     if (msg.type === 'JOIN') {
-      const name = msg.name as string
+      const name = msg.name
       // ENG-04: host status is server-assigned by connection order; never read isHost from the client message.
 
       if (!this.state) {
@@ -244,7 +278,7 @@ export default class GameServer implements Party.Server {
     // ── PLAY_CARD ───────────────────────────────────────────────────────────
     if (msg.type === 'PLAY_CARD') {
       if (!this.state) return
-      const card = msg.card as Card
+      const card = msg.card
       const playerRecord = this.getPlayerRecord(sessionId)
       if (!playerRecord) return
 
@@ -293,7 +327,7 @@ export default class GameServer implements Party.Server {
         sender.send(JSON.stringify({ type: 'ERROR', message: 'Not your turn to play the second card' }))
         return
       }
-      const card = msg.card as Card
+      const card = msg.card
       const playerRecord = this.getPlayerRecord(sessionId)
       if (!playerRecord) return
 
@@ -333,7 +367,7 @@ export default class GameServer implements Party.Server {
     // ── SET_FIXED_PRICE ─────────────────────────────────────────────────────
     if (msg.type === 'SET_FIXED_PRICE') {
       if (!this.state) return
-      this.state.game = setFixedPrice(this.state.game, msg.price as number)
+      this.state.game = setFixedPrice(this.state.game, msg.price)
       await this.persist()
       this.broadcastStateSecure()
       return
@@ -375,7 +409,7 @@ export default class GameServer implements Party.Server {
       if (!this.state) return
       const session = this.state.sessions[sessionId]
       if (!session) return
-      this.state.game = placeOpenBid(this.state.game, session.position, msg.amount as number)
+      this.state.game = placeOpenBid(this.state.game, session.position, msg.amount)
       await this.persist()
       this.broadcastStateSecure()
       return
@@ -398,7 +432,7 @@ export default class GameServer implements Party.Server {
       const session = this.state.sessions[sessionId]
       if (!session) return
       const allRecords = this.getAllPlayerRecords()
-      const result = placeOnceAroundBid(this.state.game, allRecords, session.position, msg.amount as number | null)
+      const result = placeOnceAroundBid(this.state.game, allRecords, session.position, msg.amount)
       if ('updatedPlayers' in result) {
         this.applyPlayerUpdates(result.updatedGame, result.updatedPlayers)
       } else {
@@ -415,7 +449,7 @@ export default class GameServer implements Party.Server {
       const session = this.state.sessions[sessionId]
       if (!session) return
       const allRecords = this.getAllPlayerRecords()
-      const result = submitSealedBid(this.state.game, allRecords, session.position, msg.amount as number)
+      const result = submitSealedBid(this.state.game, allRecords, session.position, msg.amount)
       if ('updatedPlayers' in result && result.updatedPlayers) {
         this.applyPlayerUpdates(result.updatedGame, result.updatedPlayers)
       } else {

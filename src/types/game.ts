@@ -79,7 +79,6 @@ export type PublicGameState = Omit<GameState, 'deck' | 'auction'> & {
 
 export interface PlayerRecord {
   id: string
-  gameId: string
   sessionId: string
   displayName: string
   position: number

@@ -354,7 +354,7 @@ export function submitSealedBid(
     }
     // Check auctioneer too
     const auctBid = sealedBids[auction.auctioneerIdx] ?? 0
-    if (auctBid > maxBid) { maxBid = auctBid; winnerIdx = auction.auctioneerIdx }
+    if (auctBid >= maxBid && maxBid > 0) { maxBid = auctBid; winnerIdx = auction.auctioneerIdx }
 
     if (maxBid === 0) {
       // Everyone bid 0 → auctioneer gets free
