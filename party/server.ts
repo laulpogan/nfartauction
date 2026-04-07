@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type {
   GameState, Card, Artist, RoundResult,
   PublicGameState, PublicAuctionState,
+  GamePhase, SimState, PlayerSimState,
 } from '../src/types/game'
 import { ARTISTS } from '../src/types/game'
 import {
@@ -11,7 +12,12 @@ import {
   passFixedPrice, placeOpenBid, endOpenAuction, placeOnceAroundBid,
   submitSealedBid, endRound, startGame,
 } from '../src/lib/engine'
-import { createInitialSimState } from '../src/lib/sim-config'
+import { resolveSlots, advanceDay } from '../src/lib/sim-engine'
+import {
+  SIM_CONFIG,
+  createInitialPlayerSimState,
+  createInitialSimState,
+} from '../src/lib/sim-config'
 import type { PlayerRecord } from '../src/types/game'
 
 // ─── Inbound message schema (ENG-05) ──────────────────────────────────────────
@@ -22,6 +28,16 @@ const CardSchema = z.object({
   id: z.string(),
   artist: ArtistSchema,
   auctionType: AuctionTypeSchema,
+})
+
+// Phase 3 sim-loop schemas. SlotType and Neighborhood enums must match the
+// string unions in src/types/game.ts and the NEIGHBORHOOD_DEFINITIONS keys.
+const SlotTypeSchema = z.enum(['gallery_work', 'studio_visits', 'art_fair', 'opening', 'party', 'sleep'])
+const NeighborhoodSchema = z.enum(['gallery', 'warehouse', 'flatlands', 'hotel', 'online'])
+const TimeSlotSchema = z.object({
+  id: z.string().min(1).max(64),
+  type: SlotTypeSchema,
+  neighborhood: NeighborhoodSchema.nullable(),
 })
 
 const InboundMessage = z.discriminatedUnion('type', [
@@ -37,8 +53,15 @@ const InboundMessage = z.discriminatedUnion('type', [
   z.object({ type: z.literal('END_OPEN_AUCTION') }),
   z.object({ type: z.literal('PLACE_ONCE_AROUND_BID'), amount: z.number().int().min(0).nullable() }),
   z.object({ type: z.literal('SUBMIT_SEALED_BID'), amount: z.number().int().min(0) }),
+  // Phase 3 sim-loop: player submits their day plan. Zod caps array length
+  // at 20 to bound worst-case work per message (T-3-10 DoS mitigation).
+  z.object({ type: z.literal('SUBMIT_SLOTS'), slots: z.array(TimeSlotSchema).max(20) }),
 ])
 type InboundMessage = z.infer<typeof InboundMessage>
+
+// Exported for colocated Zod schema unit tests (see party/server.test.ts).
+// The schema is not a secret — clients must be able to craft valid messages.
+export { InboundMessage as InboundMessageSchema }
 
 // ─── Server state ─────────────────────────────────────────────────────────────
 
@@ -56,6 +79,16 @@ interface ServerState {
   hands: Record<string, Card[]>       // sessionId → hand
   sessions: Record<string, Session>   // sessionId → session info
   lastRoundResult?: RoundResult       // persisted for reconnect recovery (ENG-09)
+  // Phase 3 sim-loop: global sim snapshot (public) + per-player private state.
+  // playerSim is NEVER serialized into broadcastStateSecure; it only flows
+  // through broadcastSimStatePrivate (per-connection YOUR_SIM_STATE messages).
+  // TODO(phase-3-storage): STATE.md blocker — PartyKit 0.0.115 storage backend
+  // (SQLite 2 MB vs KV 128 KiB per key) needs verification before we split
+  // this into multiple storage keys. For now the entire ServerState rides in
+  // a single 'state' key (same as Phase 1/2) and we'll revisit after the
+  // storage API shape is confirmed.
+  sim: SimState
+  playerSim: Record<string, PlayerSimState>
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -134,6 +167,23 @@ export default class GameServer implements Party.Server {
 
   async onStart() {
     this.state = await this.room.storage.get<ServerState>('state') ?? null
+    if (this.state) {
+      // Backfill sim-loop fields for any pre-Phase-3 persisted state.
+      if (!this.state.sim) this.state.sim = createInitialSimState()
+      if (!this.state.playerSim) this.state.playerSim = {}
+      // Also backfill game.phase and game.sim for old saved games that
+      // predate the Phase 3 types extension.
+      if (!this.state.game.phase) {
+        this.state.game = { ...this.state.game, phase: { type: 'lobby' } }
+      }
+      if (!this.state.game.sim) {
+        this.state.game = { ...this.state.game, sim: createInitialSimState() }
+      }
+      // If the loaded phase is mid-sim_day, re-arm the submission timeout.
+      if (this.state.game.phase.type === 'sim_day') {
+        this.startSimDayTimeout()
+      }
+    }
   }
 
   async onConnect(conn: Party.Connection) {
@@ -143,6 +193,11 @@ export default class GameServer implements Party.Server {
     // Send private hand
     const hand = this.state.hands[conn.id] ?? []
     conn.send(JSON.stringify({ type: 'YOUR_HAND', hand }))
+    // Phase 3: send private sim state to this connection (mirrors YOUR_HAND).
+    const simState = this.state.playerSim[conn.id]
+    if (simState) {
+      conn.send(JSON.stringify({ type: 'YOUR_SIM_STATE', simState }))
+    }
     // ENG-09: replay last round summary if a round resolved while we were gone
     if (this.state.lastRoundResult && this.state.game.status === 'playing') {
       conn.send(JSON.stringify({ type: 'ROUND_END', result: this.state.lastRoundResult }))
@@ -201,12 +256,19 @@ export default class GameServer implements Party.Server {
           game: initialGame,
           hands: { [sessionId]: [] },
           sessions: { [sessionId]: session },
+          sim: createInitialSimState(),
+          playerSim: { [sessionId]: createInitialPlayerSimState(sessionId) },
         }
       } else {
         // Check if already in session (reconnect)
         if (this.state.sessions[sessionId]) {
           sender.send(JSON.stringify({ type: 'GAME_STATE', game: derivePublicState(this.state.game) }))
           sender.send(JSON.stringify({ type: 'YOUR_HAND', hand: this.state.hands[sessionId] ?? [] }))
+          // Phase 3: replay private sim state to reconnecting player.
+          const simStateReconnect = this.state.playerSim[sessionId]
+          if (simStateReconnect) {
+            sender.send(JSON.stringify({ type: 'YOUR_SIM_STATE', simState: simStateReconnect }))
+          }
           if (this.state.lastRoundResult && this.state.game.status === 'playing') {
             sender.send(JSON.stringify({ type: 'ROUND_END', result: this.state.lastRoundResult }))
           }
@@ -225,6 +287,7 @@ export default class GameServer implements Party.Server {
         const session: Session = { sessionId, name, isHost: false, position, money: 100000, paintings: [] }
         this.state.sessions[sessionId] = session
         this.state.hands[sessionId] = []
+        this.state.playerSim[sessionId] = createInitialPlayerSimState(sessionId)
         this.state.game = {
           ...this.state.game,
           players: [...this.state.game.players, sessionToPublicPlayer(session)],
@@ -256,10 +319,20 @@ export default class GameServer implements Party.Server {
         if (sess) newSessions[p.sessionId] = { ...sess, money: p.money, paintings: p.paintings }
       }
 
-      this.state = { ...this.state, game: updatedGame, hands: newHands, sessions: newSessions }
+      // Phase 3: first sim_day opens BEFORE the first auction round. The
+      // sim state has already been initialized at lobby creation time; here
+      // we simply transition phase → sim_day(1) and arm the 60s timeout.
+      const gameWithPhase: GameState = {
+        ...updatedGame,
+        phase: { type: 'sim_day', dayNumber: 1, submittedSessionIds: [] },
+        sim: this.state.sim,
+      }
+      this.state = { ...this.state, game: gameWithPhase, hands: newHands, sessions: newSessions }
+      this.startSimDayTimeout()
       await this.persist()
       this.broadcastStateSecure()
       this.broadcastHands()
+      this.broadcastSimStatePrivate()
       return
     }
 
@@ -286,7 +359,22 @@ export default class GameServer implements Party.Server {
           }
         })
 
-        this.state.game = finalGame
+        // Phase 3: auction round-end → transition phase. At end of round 4
+        // the game is over; otherwise we flow back into a sim_day with an
+        // incremented dayNumber and re-arm the submission timeout.
+        let nextPhase: GamePhase
+        if (finalGame.status === 'game_over') {
+          nextPhase = { type: 'game_over' }
+        } else {
+          const nextDayNumber = this.state.sim.dayNumber + 1
+          nextPhase = { type: 'sim_day', dayNumber: nextDayNumber, submittedSessionIds: [] }
+        }
+        this.state.game = { ...finalGame, phase: nextPhase, sim: this.state.sim }
+        if (nextPhase.type === 'sim_day') {
+          this.startSimDayTimeout()
+        } else {
+          this.clearSimDayTimeout()
+        }
         // ENG-09: persist last round result so reconnecting players can replay it
         this.state.lastRoundResult = result
         await this.persist()
@@ -447,6 +535,52 @@ export default class GameServer implements Party.Server {
       this.broadcastStateSecure()
       return
     }
+
+    // ── SUBMIT_SLOTS (Phase 3 sim-loop) ─────────────────────────────────────
+    // Player submits their day plan. We stash the slots on the owning
+    // PlayerSimState but DO NOT resolve them yet — resolution happens once in
+    // advanceFromSimDay (either when everyone has submitted or when the 60s
+    // hard timeout fires). This guarantees all players see the world state
+    // advance simultaneously, and makes the resolution path idempotent.
+    if (msg.type === 'SUBMIT_SLOTS') {
+      if (!this.state) return
+      if (this.state.game.phase.type !== 'sim_day') {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'Not in sim day phase' }))
+        return
+      }
+      const session = this.state.sessions[sessionId]
+      if (!session) {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'Unknown player' }))
+        return
+      }
+      const existingSim = this.state.playerSim[sessionId]
+      if (!existingSim) {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'No sim state for player' }))
+        return
+      }
+      // Stash the slots — resolution is deferred to advanceFromSimDay.
+      this.state.playerSim[sessionId] = { ...existingSim, scheduledSlots: msg.slots }
+
+      const phase = this.state.game.phase
+      const submitted = new Set(phase.submittedSessionIds)
+      submitted.add(sessionId)
+      this.state.game = {
+        ...this.state.game,
+        phase: { ...phase, submittedSessionIds: Array.from(submitted) },
+      }
+
+      await this.persist()
+      this.broadcastStateSecure()
+      // Also send this player's updated private sim state (slots echo).
+      sender.send(JSON.stringify({ type: 'YOUR_SIM_STATE', simState: this.state.playerSim[sessionId] }))
+
+      // If every known player has submitted, advance immediately.
+      const activeSessionIds = Object.keys(this.state.sessions)
+      if (activeSessionIds.length > 0 && activeSessionIds.every(id => submitted.has(id))) {
+        await this.advanceFromSimDay('all_submitted')
+      }
+      return
+    }
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -491,6 +625,109 @@ export default class GameServer implements Party.Server {
     for (const conn of this.room.getConnections()) {
       const hand = this.state.hands[conn.id] ?? []
       conn.send(JSON.stringify({ type: 'YOUR_HAND', hand }))
+    }
+  }
+
+  // ─── Phase 3 sim-loop internals ────────────────────────────────────────────
+  //
+  // Privacy invariant: state.playerSim is NEVER referenced inside
+  // derivePublicState or broadcastStateSecure. The only path from the server
+  // to the client for a PlayerSimState is broadcastSimStatePrivate below,
+  // which iterates connections and looks up state.playerSim[conn.id]. This
+  // mirrors the YOUR_HAND pattern from Phase 1.
+
+  private simDayTimer: ReturnType<typeof setTimeout> | null = null
+  private advancingFromSimDay = false
+
+  private startSimDayTimeout() {
+    this.clearSimDayTimeout()
+    this.simDayTimer = setTimeout(() => {
+      void this.advanceFromSimDay('timeout')
+    }, SIM_CONFIG.SUBMISSION_TIMEOUT_MS)
+  }
+
+  private clearSimDayTimeout() {
+    if (this.simDayTimer) {
+      clearTimeout(this.simDayTimer)
+      this.simDayTimer = null
+    }
+  }
+
+  private broadcastSimStatePrivate() {
+    if (!this.state) return
+    for (const conn of this.room.getConnections()) {
+      const simState = this.state.playerSim[conn.id]
+      if (simState) {
+        conn.send(JSON.stringify({ type: 'YOUR_SIM_STATE', simState }))
+      }
+    }
+  }
+
+  /**
+   * Resolve all player day plans and transition sim_day → auction_round.
+   * Idempotent via this.advancingFromSimDay guard: protects against the
+   * timeout firing while the final submission is mid-processing (T-3-11).
+   */
+  private async advanceFromSimDay(_reason: 'all_submitted' | 'timeout') {
+    if (!this.state) return
+    if (this.advancingFromSimDay) return
+    if (this.state.game.phase.type !== 'sim_day') return
+    this.advancingFromSimDay = true
+    try {
+      this.clearSimDayTimeout()
+
+      const sim = this.state.sim
+      const players = this.state.game.players
+
+      // Resolve each player's day in position order. resolveSlots is a no-op
+      // for empty slot arrays — that's the timeout-with-no-submission path.
+      const updatedPlayerSimMap: Record<string, PlayerSimState> = {}
+      const updatedPlayers = players.map(p => {
+        const ps = this.state!.playerSim[p.sessionId]
+        if (!ps) return p
+        const { updatedPlayerSim, updatedPlayerMoney } = resolveSlots(
+          ps,
+          ps.scheduledSlots ?? [],
+          sim,
+          p,
+        )
+        updatedPlayerSimMap[p.sessionId] = { ...updatedPlayerSim, scheduledSlots: [] }
+        // Mirror coolness onto the public player projection so opponents see it.
+        return {
+          ...p,
+          money: updatedPlayerMoney,
+          coolness: updatedPlayerSim.coolness,
+        }
+      })
+
+      // Advance global sim state. Drift is deterministically zero for now;
+      // a seeded PRNG will own this in a follow-up plan.
+      const { updatedSim } = advanceDay(sim, Object.values(updatedPlayerSimMap))
+      this.state.sim = updatedSim
+      this.state.playerSim = { ...this.state.playerSim, ...updatedPlayerSimMap }
+
+      // Transition phase: sim_day → auction_round. The engine's round
+      // counter (game.round) is the authoritative auction roundNumber.
+      const nextPhase: GamePhase = {
+        type: 'auction_round',
+        roundNumber: this.state.game.round,
+      }
+      this.state.game = {
+        ...this.state.game,
+        players: updatedPlayers,
+        phase: nextPhase,
+        sim: updatedSim,
+      }
+
+      // Keep Session.money in lockstep with game.players (syncSessions is a
+      // pure helper that returns a rebuilt ServerState).
+      this.state = syncSessions(this.state)
+
+      await this.persist()
+      this.broadcastStateSecure()
+      this.broadcastSimStatePrivate()
+    } finally {
+      this.advancingFromSimDay = false
     }
   }
 
