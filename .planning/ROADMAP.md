@@ -48,13 +48,12 @@ Plans:
   3. Auction results render as a printed receipt, not a modal or result card
   4. All five auction types display distinct visual skins — a player can identify the auction type from the room aesthetic alone
   5. The Online neighborhood UI shows the flickering accent and incorrect font loading as a deliberate design state
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: Design token system — Tailwind config, five neighborhood accent tokens, white/black base
-- [ ] 02-02: Wall-label typography component, receipt component, appraisal form component
-- [ ] 02-03: Five auction type visual skins applied to existing auction UI
-- [ ] 02-04: Online neighborhood skin — flickering accent, wrong-font-loading effect
+- [ ] 02-01-PLAN.md — Wave 0 atomic palette swap: @theme tokens, NeighborhoodContext, jsdom test infra, dark→white rewrite of all 5 game components (AEST-01, AEST-02)
+- [ ] 02-02-PLAN.md — Three aesthetic primitives (WallLabel, Receipt, AppraisalForm) + replace round-end + game-over modals with Receipt + thread WallLabel into GameBoard header (AEST-03, AEST-04, AEST-05)
+- [ ] 02-03-PLAN.md — Five auction visual skins dispatched from AuctionPanel + OnlineNeighborhood broken-font wrapper (AEST-06 through AEST-11)
 **UI hint**: yes
 
 ### Phase 3: Core Sim Loop
@@ -135,7 +134,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Engine Hardening & Security | 3/3 | Complete   | 2026-04-07 |
-| 2. Aesthetic System Foundation | 0/4 | Not started | - |
+| 2. Aesthetic System Foundation | 0/3 | Not started | - |
 | 3. Core Sim Loop | 0/4 | Not started | - |
 | 4. Sim Depth — Relationships, Landlord, Drugs | 0/4 | Not started | - |
 | 5. NFT Layer & End State | 0/3 | Not started | - |
