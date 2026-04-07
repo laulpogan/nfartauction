@@ -181,6 +181,30 @@ export interface TimeSlot {
   targetCharacterId?: string
 }
 
+// ─── Phase 4 Plan 03: Drug system ──────────────────────────────────────────
+
+/**
+ * Drug item kinds. Each maps to a DRUG_DEFINITIONS entry in sim-config that
+ * supplies the gallery-bio register display strings (the "Untitled (White),
+ * mixed media, 2024" = 1g coke bit) and the coolness/restedness deltas
+ * applied when the item is used at a party.
+ */
+export type DrugItemKind = 'coke' | 'mdma' | 'ketamine' | 'pills'
+
+/**
+ * An item in a player's drug inventory. id is server-generated
+ * (crypto.randomUUID in party/server.ts) so the pure engine stays
+ * entropy-free. displayLabel + displayMeta match the wall-label format used
+ * by the painting collection — DrugInventory renders them inside an
+ * AppraisalForm, one row per item.
+ */
+export interface DrugItem {
+  id: string
+  kind: DrugItemKind
+  displayLabel: string
+  displayMeta: string
+}
+
 // ─── Phase 4: Relationship system ──────────────────────────────────────────
 
 /**
@@ -233,8 +257,12 @@ export interface PlayerSimState {
   scheduledSlots: TimeSlot[]
   // Phase 4 Plan 01: real relationship array replaces the Phase 3 stub.
   relationships: Relationship[]
-  // Phase 4 Plan 03 stub — still inert this plan.
-  drugInventory: never[]
+  // Phase 4 Plan 03: drug inventory and risk stat. drugs is acquired
+  // server-side from flatlands/hotel slots (entropy in party/server.ts);
+  // risk accumulates when drugs.length exceeds DRUG_CONFIG.riskThreshold
+  // and decays by 1 per sim_day when the inventory is empty.
+  drugs: DrugItem[]
+  risk: number
   // Phase 4 Plan 01: the `droppedArtist` is the Artist the player "shouldn't
   // have dropped" — server-seeded at game start via seedDroppedArtist().
   // The canonical source of truth is the corresponding Relationship with

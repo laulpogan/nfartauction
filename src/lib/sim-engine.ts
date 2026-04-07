@@ -27,12 +27,17 @@ import type {
   Faction,
   Artist,
   LandlordStage,
+  DrugItem,
+  DrugItemKind,
+  PlayerStats,
 } from '../types/game'
 import {
   SLOT_DEFINITIONS,
   SIM_CONFIG,
   RELATIONSHIP_CONFIG,
   LANDLORD_CONFIG,
+  DRUG_CONFIG,
+  DRUG_DEFINITIONS,
 } from './sim-config'
 
 export interface ResolveSlotsResult {
@@ -409,6 +414,103 @@ export function progressLandlord(
   }
 }
 
+// ─── Phase 4 Plan 03: Drug system pure functions ──────────────────────────
+
+/**
+ * Append a new drug item to the player's inventory. The `id` is provided by
+ * the caller (server-generated via crypto.randomUUID) so the engine stays
+ * entropy-free. Display strings are sourced from DRUG_DEFINITIONS[kind] —
+ * the gallery-bio register ("Untitled (White), mixed media, 2024" = 1g coke)
+ * is the whole bit of the feature, so it lives in config, not at call sites.
+ *
+ * Pure: returns a new PlayerSimState; never mutates the input.
+ */
+export function addDrugItem(
+  playerSim: PlayerSimState,
+  kind: DrugItemKind,
+  id: string,
+): PlayerSimState {
+  const def = DRUG_DEFINITIONS[kind]
+  const item: DrugItem = {
+    id,
+    kind,
+    displayLabel: def.displayLabel,
+    displayMeta: def.displayMeta,
+  }
+  return { ...playerSim, drugs: [...playerSim.drugs, item] }
+}
+
+/**
+ * Remove a drug item by id. Unknown ids return the input unchanged (no-op),
+ * which is the correct behavior for the server's addDrugItem → removeDrugItem
+ * party-use flow in the presence of a race. Pure: never mutates the input.
+ */
+export function removeDrugItem(
+  playerSim: PlayerSimState,
+  id: string,
+): PlayerSimState {
+  const idx = playerSim.drugs.findIndex(d => d.id === id)
+  if (idx === -1) return playerSim
+  const drugs = playerSim.drugs.slice()
+  drugs.splice(idx, 1)
+  return { ...playerSim, drugs }
+}
+
+export interface ApplyDrugEffectsResult {
+  updatedPlayerSim: PlayerSimState
+  statDeltas: Partial<Record<keyof PlayerStats, number>>
+}
+
+/**
+ * Apply a drug's +Coolness / -Restedness effects to the player. Used at
+ * party slots in party/server.ts after the item has been consumed (the
+ * removeDrugItem call is the server's responsibility, not this function's).
+ *
+ * Both stats are clamped to [0, 100]; the returned deltas reflect the
+ * ACTUAL change (post-clamp), so event logging and UI can show the real
+ * mutation, not the uncapped intent. Pure: no mutation of the input.
+ */
+export function applyDrugEffects(
+  playerSim: PlayerSimState,
+  kind: DrugItemKind,
+): ApplyDrugEffectsResult {
+  const def = DRUG_DEFINITIONS[kind]
+  const beforeCool = playerSim.coolness
+  const beforeRest = playerSim.restedness
+  const coolness = clamp(beforeCool + def.coolness, 0, 100)
+  const restedness = clamp(beforeRest + def.restedness, 0, 100)
+  return {
+    updatedPlayerSim: { ...playerSim, coolness, restedness },
+    statDeltas: {
+      coolness: coolness - beforeCool,
+      restedness: restedness - beforeRest,
+    },
+  }
+}
+
+/**
+ * Per-sim_day risk tick. Three branches:
+ *   - drugs.length >  DRUG_CONFIG.riskThreshold → risk += riskPerDay (clamped 100)
+ *   - drugs.length === 0                        → risk = max(0, risk - 1)
+ *   - otherwise                                 → risk unchanged
+ *
+ * Called inside party/server.ts advanceFromSimDay per player after
+ * progressLandlord and before advanceDay. Pure: no mutation, no entropy.
+ */
+export function accumulateRisk(playerSim: PlayerSimState): PlayerSimState {
+  const count = playerSim.drugs.length
+  if (count > DRUG_CONFIG.riskThreshold) {
+    return {
+      ...playerSim,
+      risk: clamp(playerSim.risk + DRUG_CONFIG.riskPerDay, 0, 100),
+    }
+  }
+  if (count === 0) {
+    return { ...playerSim, risk: Math.max(0, playerSim.risk - 1) }
+  }
+  return playerSim
+}
+
 export interface AuctionModifiers {
   bidCeilingMultiplier: number
   luckRoll: number
@@ -448,6 +550,8 @@ export {
   RELATIONSHIP_DEFINITIONS,
   LANDLORD_CONFIG,
   LANDLORD_MESSAGES,
+  DRUG_CONFIG,
+  DRUG_DEFINITIONS,
 } from './sim-config'
 
 function clamp(n: number, lo: number, hi: number): number {

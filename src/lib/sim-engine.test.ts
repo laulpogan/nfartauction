@@ -13,9 +13,15 @@ import {
   deriveCredibilityPenalty,
   seedDroppedArtist,
   progressLandlord,
+  addDrugItem,
+  removeDrugItem,
+  applyDrugEffects,
+  accumulateRisk,
   RELATIONSHIP_CONFIG,
   LANDLORD_CONFIG,
   LANDLORD_MESSAGES,
+  DRUG_CONFIG,
+  DRUG_DEFINITIONS,
 } from './sim-engine'
 import type {
   PlayerSimState,
@@ -576,5 +582,112 @@ describe('progressLandlord', () => {
       expect(typeof LANDLORD_MESSAGES[stage]).toBe('string')
       expect(LANDLORD_MESSAGES[stage].length).toBeGreaterThan(0)
     }
+  })
+})
+
+// ─── Phase 4 Plan 03: drug system ──────────────────────────────────────────
+
+describe('addDrugItem', () => {
+  it('appends an item with display strings sourced from DRUG_DEFINITIONS', () => {
+    const ps = createInitialPlayerSimState('s0')
+    const next = addDrugItem(ps, 'coke', 'drug-1')
+    expect(next.drugs.length).toBe(1)
+    expect(next.drugs[0].id).toBe('drug-1')
+    expect(next.drugs[0].kind).toBe('coke')
+    expect(next.drugs[0].displayLabel).toBe(DRUG_DEFINITIONS.coke.displayLabel)
+    expect(next.drugs[0].displayMeta).toBe(DRUG_DEFINITIONS.coke.displayMeta)
+  })
+
+  it('does not mutate input playerSim', () => {
+    const ps = createInitialPlayerSimState('s0')
+    const snapshot = JSON.parse(JSON.stringify(ps))
+    addDrugItem(ps, 'mdma', 'drug-x')
+    expect(ps).toEqual(snapshot)
+  })
+})
+
+describe('removeDrugItem', () => {
+  it('removes by id', () => {
+    let ps = createInitialPlayerSimState('s0')
+    ps = addDrugItem(ps, 'coke', 'drug-1')
+    ps = addDrugItem(ps, 'mdma', 'drug-2')
+    const next = removeDrugItem(ps, 'drug-1')
+    expect(next.drugs.length).toBe(1)
+    expect(next.drugs[0].id).toBe('drug-2')
+  })
+
+  it('no-op when id is missing', () => {
+    let ps = createInitialPlayerSimState('s0')
+    ps = addDrugItem(ps, 'coke', 'drug-1')
+    const next = removeDrugItem(ps, 'nonexistent')
+    expect(next.drugs.length).toBe(1)
+    expect(next.drugs[0].id).toBe('drug-1')
+  })
+})
+
+describe('applyDrugEffects', () => {
+  it('applies coke coolness and restedness deltas', () => {
+    const ps = { ...createInitialPlayerSimState('s0'), coolness: 20, restedness: 80 }
+    const { updatedPlayerSim, statDeltas } = applyDrugEffects(ps, 'coke')
+    expect(updatedPlayerSim.coolness).toBe(20 + DRUG_DEFINITIONS.coke.coolness)
+    expect(updatedPlayerSim.restedness).toBe(80 + DRUG_DEFINITIONS.coke.restedness)
+    expect(statDeltas.coolness).toBe(DRUG_DEFINITIONS.coke.coolness)
+    expect(statDeltas.restedness).toBe(DRUG_DEFINITIONS.coke.restedness)
+  })
+
+  it('clamps coolness at 100 and restedness at 0', () => {
+    const ps = { ...createInitialPlayerSimState('s0'), coolness: 99, restedness: 5 }
+    const { updatedPlayerSim } = applyDrugEffects(ps, 'mdma')
+    expect(updatedPlayerSim.coolness).toBe(100)
+    expect(updatedPlayerSim.restedness).toBe(0)
+  })
+
+  it('does not mutate input playerSim', () => {
+    const ps = createInitialPlayerSimState('s0')
+    const snapshot = JSON.parse(JSON.stringify(ps))
+    applyDrugEffects(ps, 'coke')
+    expect(ps).toEqual(snapshot)
+  })
+})
+
+describe('accumulateRisk', () => {
+  function psWithDrugs(n: number): PlayerSimState {
+    let ps = createInitialPlayerSimState('s0')
+    for (let i = 0; i < n; i++) ps = addDrugItem(ps, 'coke', `d-${i}`)
+    return ps
+  }
+
+  it('increments risk when drugs.length is strictly greater than threshold', () => {
+    const ps = psWithDrugs(DRUG_CONFIG.riskThreshold + 1)
+    const next = accumulateRisk(ps)
+    expect(next.risk).toBe(DRUG_CONFIG.riskPerDay)
+  })
+
+  it('no change at exactly the threshold', () => {
+    const ps = { ...psWithDrugs(DRUG_CONFIG.riskThreshold), risk: 20 }
+    const next = accumulateRisk(ps)
+    expect(next.risk).toBe(20)
+  })
+
+  it('clamps risk to 100', () => {
+    const ps = { ...psWithDrugs(DRUG_CONFIG.riskThreshold + 3), risk: 98 }
+    const next = accumulateRisk(ps)
+    expect(next.risk).toBe(100)
+  })
+
+  it('decays by 1 when inventory is empty, with a floor of 0', () => {
+    const ps = { ...createInitialPlayerSimState('s0'), risk: 5 }
+    const next = accumulateRisk(ps)
+    expect(next.risk).toBe(4)
+
+    const clean = { ...createInitialPlayerSimState('s0'), risk: 0 }
+    expect(accumulateRisk(clean).risk).toBe(0)
+  })
+
+  it('does not mutate input playerSim', () => {
+    const ps = { ...psWithDrugs(DRUG_CONFIG.riskThreshold + 1), risk: 10 }
+    const snapshot = JSON.parse(JSON.stringify(ps))
+    accumulateRisk(ps)
+    expect(ps).toEqual(snapshot)
   })
 })

@@ -15,6 +15,7 @@ import type {
   SimState,
   Relationship,
   LandlordStage,
+  DrugItemKind,
 } from '../types/game'
 
 export const SIM_CONFIG = {
@@ -224,6 +225,43 @@ export const LANDLORD_MESSAGES: Record<LandlordStage, string> = {
   5: 'as discussed, lease terminates end of month. happy to recommend a relocation broker.',
 }
 
+// ─── Phase 4 Plan 03: Drug system ──────────────────────────────────────────
+
+/**
+ * Tunables for the drug inventory + risk stat system.
+ *
+ *  - riskThreshold: if drugs.length is STRICTLY GREATER than this, risk
+ *    accumulates each sim_day at riskPerDay. At or below threshold, risk is
+ *    static. An empty inventory decays risk by 1 per sim_day (floor 0).
+ *  - acquisitionProbability: per-slot chance of acquiring a drug at a
+ *    flatlands or hotel scheduled slot. Rolled server-side (party/server.ts)
+ *    using Math.random so the engine stays pure.
+ */
+export const DRUG_CONFIG = {
+  riskThreshold: 5,
+  riskPerDay: 8,
+  acquisitionProbability: { flatlands: 0.35, hotel: 0.20 },
+} as const
+
+/**
+ * Per-kind drug metadata. displayLabel/displayMeta match the painting
+ * collection wall-label format — DrugInventory renders them via
+ * AppraisalForm so "Untitled (White), mixed media, 2024" reads as 1g coke.
+ * coolness/restedness are the deltas applied at a party slot by
+ * applyDrugEffects (clamped to [0,100]).
+ */
+export const DRUG_DEFINITIONS: Record<DrugItemKind, {
+  displayLabel: string
+  displayMeta: string
+  coolness: number
+  restedness: number
+}> = {
+  coke:     { displayLabel: 'Untitled (White)',       displayMeta: 'mixed media, 2024',     coolness: 8,  restedness: -15 },
+  mdma:     { displayLabel: 'Heart in Hand',          displayMeta: 'pressed pigment, 2024', coolness: 12, restedness: -25 },
+  ketamine: { displayLabel: 'Untitled (After Hours)', displayMeta: 'powder on glass, 2024', coolness: 6,  restedness: -10 },
+  pills:    { displayLabel: 'Lozenges (Series II)',   displayMeta: 'edition of 100, 2024',  coolness: 5,  restedness:  -8 },
+}
+
 // Dev-mode transaction log. Production builds drop this entirely via the
 // import.meta.env.DEV branch elimination Vite performs at build time.
 export function logSimTransaction(event: SimEvent, sessionId: string): void {
@@ -247,7 +285,9 @@ export function createInitialPlayerSimState(sessionId: string): PlayerSimState {
     scheduledSlots: [],
     // Deep clone so players never share relationship array references.
     relationships: RELATIONSHIP_DEFINITIONS.map(r => ({ ...r })),
-    drugInventory: [],
+    // Phase 4 Plan 03: drug inventory + risk stat both start empty/0.
+    drugs: [],
+    risk: 0,
     droppedArtist: null,
     // Phase 4 Plan 02: landlord arc starts at stage 1 with stage 1 already in
     // the seen list so the first bubble is visible immediately on day 1.
