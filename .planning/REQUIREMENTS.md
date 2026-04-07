@@ -20,8 +20,8 @@
 
 ### Aesthetic System
 
-- [ ] **AEST-01**: All UI uses the zine visual language: white base, black type, single accent color per neighborhood context
-- [ ] **AEST-02**: Five neighborhood accent colors are applied as a design token system (Gallery District blue, Warehouse amber, Flatlands red, Hotel beige, Online flickering)
+- [x] **AEST-01**: All UI uses the zine visual language: white base, black type, single accent color per neighborhood context
+- [x] **AEST-02**: Five neighborhood accent colors are applied as a design token system (Gallery District blue, Warehouse amber, Flatlands red, Hotel beige, Online flickering)
 - [ ] **AEST-03**: Wall-label typography component renders all game copy — auction results, stat displays, drug inventory — in the same format as gallery labels
 - [ ] **AEST-04**: Auction results render as a printed receipt (not a generic result card)
 - [ ] **AEST-05**: Player stats display as an appraisal form (not a HUD or dashboard)
@@ -132,8 +132,8 @@
 | ENG-08 | Phase 1 — Engine Hardening & Security | Complete |
 | ENG-09 | Phase 1 — Engine Hardening & Security | Complete |
 | ENG-10 | Phase 1 — Engine Hardening & Security | Complete |
-| AEST-01 | Phase 2 — Aesthetic System Foundation | Pending |
-| AEST-02 | Phase 2 — Aesthetic System Foundation | Pending |
+| AEST-01 | Phase 2 — Aesthetic System Foundation | Complete |
+| AEST-02 | Phase 2 — Aesthetic System Foundation | Complete |
 | AEST-03 | Phase 2 — Aesthetic System Foundation | Pending |
 | AEST-04 | Phase 2 — Aesthetic System Foundation | Pending |
 | AEST-05 | Phase 2 — Aesthetic System Foundation | Pending |
