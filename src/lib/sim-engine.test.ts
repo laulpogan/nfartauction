@@ -12,7 +12,10 @@ import {
   deriveBidLikelihoodModifiers,
   deriveCredibilityPenalty,
   seedDroppedArtist,
+  progressLandlord,
   RELATIONSHIP_CONFIG,
+  LANDLORD_CONFIG,
+  LANDLORD_MESSAGES,
 } from './sim-engine'
 import type {
   PlayerSimState,
@@ -488,5 +491,90 @@ describe('advanceDay with contactedByPlayer', () => {
     const { updatedPlayerSims } = advanceDay(makeGlobal(), [a])
     const lm = updatedPlayerSims[0].relationships.find(r => r.characterId === 'artist:lite_metal')!
     expect(lm.score).toBeCloseTo(RELATIONSHIP_CONFIG.initialScore * 0.85)
+  })
+})
+
+// ─── Phase 4 Plan 02: progressLandlord ─────────────────────────────────────
+
+describe('progressLandlord', () => {
+  it('advances stage 1 → 2 when prestige is below thresholds[0]', () => {
+    const ps = createInitialPlayerSimState('s0')
+    const r = progressLandlord(ps, 0)
+    expect(r.advanced).toBe(true)
+    expect(r.updatedPlayerSim.landlordStage).toBe(2)
+    expect(r.updatedPlayerSim.seenLandlordStages).toEqual([1, 2])
+  })
+
+  it('does not advance when prestige meets or exceeds the threshold for the current stage', () => {
+    const ps = createInitialPlayerSimState('s0')
+    const r = progressLandlord(ps, LANDLORD_CONFIG.prestigeThresholds[0])
+    expect(r.advanced).toBe(false)
+    expect(r.updatedPlayerSim.landlordStage).toBe(1)
+    expect(r.updatedPlayerSim.seenLandlordStages).toEqual([1])
+  })
+
+  it('stage 5 is terminal (no-op regardless of prestige)', () => {
+    const ps: ReturnType<typeof createInitialPlayerSimState> = {
+      ...createInitialPlayerSimState('s0'),
+      landlordStage: 5,
+      seenLandlordStages: [1, 2, 3, 4, 5],
+    }
+    const rLow = progressLandlord(ps, 0)
+    const rHigh = progressLandlord(ps, 1_000)
+    expect(rLow.advanced).toBe(false)
+    expect(rLow.updatedPlayerSim.landlordStage).toBe(5)
+    expect(rHigh.advanced).toBe(false)
+    expect(rHigh.updatedPlayerSim.landlordStage).toBe(5)
+  })
+
+  it('monotonicity: high prestige at a mid stage cannot lower the stage', () => {
+    const ps: ReturnType<typeof createInitialPlayerSimState> = {
+      ...createInitialPlayerSimState('s0'),
+      landlordStage: 3,
+      seenLandlordStages: [1, 2, 3],
+    }
+    const r = progressLandlord(ps, 10_000)
+    expect(r.updatedPlayerSim.landlordStage).toBe(3)
+    expect(r.advanced).toBe(false)
+  })
+
+  it('all 5 stages reachable in 4 sequential calls when prestige stays at 0', () => {
+    let ps = createInitialPlayerSimState('s0')
+    for (let i = 0; i < 4; i++) {
+      const r = progressLandlord(ps, 0)
+      expect(r.advanced).toBe(true)
+      ps = r.updatedPlayerSim
+    }
+    expect(ps.landlordStage).toBe(5)
+    expect(ps.seenLandlordStages).toEqual([1, 2, 3, 4, 5])
+    // A 5th call is a no-op terminal
+    const r5 = progressLandlord(ps, 0)
+    expect(r5.advanced).toBe(false)
+    expect(r5.updatedPlayerSim.landlordStage).toBe(5)
+  })
+
+  it('stalls at stage 1 across many days when prestige stays high', () => {
+    let ps = createInitialPlayerSimState('s0')
+    for (let i = 0; i < 10; i++) {
+      const r = progressLandlord(ps, 10_000)
+      expect(r.advanced).toBe(false)
+      ps = r.updatedPlayerSim
+    }
+    expect(ps.landlordStage).toBe(1)
+    expect(ps.seenLandlordStages).toEqual([1])
+  })
+
+  it('does not mutate the input playerSim (purity)', () => {
+    const ps = createInitialPlayerSimState('s0')
+    const snapshot = JSON.parse(JSON.stringify(ps))
+    progressLandlord(ps, 0)
+    expect(ps).toEqual(snapshot)
+  })
+
+  it('all 5 landlord messages are authored non-empty strings', () => {
+    for (const stage of [1, 2, 3, 4, 5] as const) {
+      expect(typeof LANDLORD_MESSAGES[stage]).toBe('string')
+      expect(LANDLORD_MESSAGES[stage].length).toBeGreaterThan(0)
+    }
   })
 })

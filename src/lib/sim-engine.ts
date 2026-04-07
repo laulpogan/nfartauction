@@ -11,6 +11,7 @@
 //   advanceDay           — increment dayNumber and apply global stat drift
 //   applyGlobalStatDrift — pure projection of drift onto SimState (clamped)
 //   applySimModifiers    — derive auction-time modifiers from sim state
+//   progressLandlord     — Phase 4 Plan 02: advance landlord arc per sim_day
 //
 // All numeric stats (coolness, restedness, luck) are clamped to [0, 100].
 // Money is clamped to a floor of 0 (defense in depth on top of Zod input
@@ -25,8 +26,14 @@ import type {
   Relationship,
   Faction,
   Artist,
+  LandlordStage,
 } from '../types/game'
-import { SLOT_DEFINITIONS, SIM_CONFIG, RELATIONSHIP_CONFIG } from './sim-config'
+import {
+  SLOT_DEFINITIONS,
+  SIM_CONFIG,
+  RELATIONSHIP_CONFIG,
+  LANDLORD_CONFIG,
+} from './sim-config'
 
 export interface ResolveSlotsResult {
   updatedPlayerSim: PlayerSimState
@@ -351,6 +358,57 @@ export function seedDroppedArtist(
   return { ...playerSim, relationships, droppedArtist: artist }
 }
 
+// ─── Phase 4 Plan 02: Landlord arc pure function ──────────────────────────
+
+export interface ProgressLandlordResult {
+  updatedPlayerSim: PlayerSimState
+  /** True iff landlordStage advanced by 1 this call. */
+  advanced: boolean
+}
+
+/**
+ * Advance the landlord arc at most one stage per call based on the player's
+ * current prestige. Monotonic (one-way ratchet): stage never decreases. Pure
+ * — no Math.random / Date.now / console, no mutation of the input.
+ *
+ * Gate semantics (LANDLORD_CONFIG.prestigeThresholds):
+ *   thresholds[0] → prestige required to STAY at stage 1 (gate for 1→2)
+ *   thresholds[1] → gate for 2→3
+ *   thresholds[2] → gate for 3→4
+ *   thresholds[3] → gate for 4→5
+ *
+ *  - currentStage === 5  → terminal, no-op
+ *  - prestige  <  threshold → advance to currentStage + 1, append to seen list
+ *  - prestige  >= threshold → no-op (stalled)
+ *
+ * Intended call site: party/server.ts advanceFromSimDay, once per player per
+ * sim_day, after resolveSlots and before advanceDay. The server passes the
+ * player's PublicPlayer.prestige (server-authoritative) as the gate input —
+ * clients cannot influence this value (T-4-10 mitigation).
+ */
+export function progressLandlord(
+  playerSim: PlayerSimState,
+  prestige: number,
+): ProgressLandlordResult {
+  const stage = playerSim.landlordStage
+  if (stage >= 5) {
+    return { updatedPlayerSim: playerSim, advanced: false }
+  }
+  const threshold = LANDLORD_CONFIG.prestigeThresholds[stage - 1]
+  if (prestige >= threshold) {
+    return { updatedPlayerSim: playerSim, advanced: false }
+  }
+  const nextStage = (stage + 1) as LandlordStage
+  return {
+    updatedPlayerSim: {
+      ...playerSim,
+      landlordStage: nextStage,
+      seenLandlordStages: [...playerSim.seenLandlordStages, nextStage],
+    },
+    advanced: true,
+  }
+}
+
 export interface AuctionModifiers {
   bidCeilingMultiplier: number
   luckRoll: number
@@ -384,7 +442,13 @@ export { createInitialPlayerSimState, createInitialSimState } from './sim-config
 
 // Also re-export SIM_CONFIG so callers don't need to import two modules
 // just to read the timeout constant.
-export { SIM_CONFIG, RELATIONSHIP_CONFIG, RELATIONSHIP_DEFINITIONS } from './sim-config'
+export {
+  SIM_CONFIG,
+  RELATIONSHIP_CONFIG,
+  RELATIONSHIP_DEFINITIONS,
+  LANDLORD_CONFIG,
+  LANDLORD_MESSAGES,
+} from './sim-config'
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n))

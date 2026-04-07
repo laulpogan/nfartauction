@@ -183,6 +183,14 @@ export interface TimeSlot {
 
 // ─── Phase 4: Relationship system ──────────────────────────────────────────
 
+/**
+ * Landlord arc stage. 1..5 monotonic ratchet — once a stage is reached it
+ * cannot be lowered. Stage 5 is terminal ("you're out"). Set on PlayerSimState
+ * and advanced per sim_day by the pure progressLandlord function; the only
+ * writer is the server inside advanceFromSimDay (T-4-08 mitigation).
+ */
+export type LandlordStage = 1 | 2 | 3 | 4 | 5
+
 export type Faction = 'painters' | 'sculptors' | 'video_art' | 'social_political'
 export type RelationshipCharacterKind = 'artist' | 'collector'
 
@@ -232,6 +240,13 @@ export interface PlayerSimState {
   // The canonical source of truth is the corresponding Relationship with
   // isDroppedArtist=true; this field is a quick-lookup mirror.
   droppedArtist: Artist | null
+  // Phase 4 Plan 02: landlord 5-stage arc. Monotonic ratchet (only advances),
+  // gated by PublicPlayer.prestige via progressLandlord in sim-engine. The
+  // chronological history of stages that have been reached (seenLandlordStages)
+  // drives the iMessage-style bubble list in LandlordMessages.tsx. Both fields
+  // are initialized by createInitialPlayerSimState to stage 1 / [1].
+  landlordStage: LandlordStage
+  seenLandlordStages: LandlordStage[]
   // Faction alignment is DERIVED, never stored. Use deriveFactionAlignment()
   // in sim-engine to compute it on read. The field is intentionally omitted
   // from this interface so writing `playerSim.faction = ...` is a compile

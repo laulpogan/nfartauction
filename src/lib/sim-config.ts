@@ -14,6 +14,7 @@ import type {
   PlayerSimState,
   SimState,
   Relationship,
+  LandlordStage,
 } from '../types/game'
 
 export const SIM_CONFIG = {
@@ -192,6 +193,37 @@ export const RELATIONSHIP_DEFINITIONS: Relationship[] = [
   },
 ]
 
+// ─── Phase 4 Plan 02: Landlord arc ─────────────────────────────────────────
+
+/**
+ * Prestige thresholds gating stage advancement. Each index i holds the
+ * prestige required to NOT advance from stage (i+1) to stage (i+2) on a
+ * given sim_day. If PublicPlayer.prestige is BELOW the threshold for the
+ * current stage, progressLandlord advances one step. Low prestige → fast
+ * loss; high prestige → stall. Values are playtest placeholders.
+ *
+ *   thresholds[0] → stay at stage 1 (gate for 1→2)
+ *   thresholds[1] → stay at stage 2 (gate for 2→3)
+ *   thresholds[2] → stay at stage 3 (gate for 3→4)
+ *   thresholds[3] → stay at stage 4 (gate for 4→5)
+ */
+export const LANDLORD_CONFIG = {
+  prestigeThresholds: [10, 25, 45, 70] as const,
+} as const
+
+/**
+ * Authored landlord text for each stage. One sentence, zine register — no
+ * marketing copy, no exclamation marks. Rendered as iMessage-style bubbles
+ * by LandlordMessages.tsx using WallLabel typography.
+ */
+export const LANDLORD_MESSAGES: Record<LandlordStage, string> = {
+  1: 'hey just a heads-up, slight lease adjustment coming. nothing to worry about.',
+  2: 'got a sec to grab coffee this week? want to walk through the new lease terms in person.',
+  3: 'attaching the new lease. effective next month. let me know if questions.',
+  4: 'renovation crew is in the building thurs–sun. please move all stock away from the south wall.',
+  5: 'as discussed, lease terminates end of month. happy to recommend a relocation broker.',
+}
+
 // Dev-mode transaction log. Production builds drop this entirely via the
 // import.meta.env.DEV branch elimination Vite performs at build time.
 export function logSimTransaction(event: SimEvent, sessionId: string): void {
@@ -217,6 +249,10 @@ export function createInitialPlayerSimState(sessionId: string): PlayerSimState {
     relationships: RELATIONSHIP_DEFINITIONS.map(r => ({ ...r })),
     drugInventory: [],
     droppedArtist: null,
+    // Phase 4 Plan 02: landlord arc starts at stage 1 with stage 1 already in
+    // the seen list so the first bubble is visible immediately on day 1.
+    landlordStage: 1,
+    seenLandlordStages: [1],
   }
 }
 

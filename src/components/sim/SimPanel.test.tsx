@@ -52,6 +52,8 @@ const playerSim: PlayerSimState = {
   drugInventory: [],
   relationships: [],
   droppedArtist: null,
+  landlordStage: 1,
+  seenLandlordStages: [1],
 }
 
 describe('SimPanel', () => {
