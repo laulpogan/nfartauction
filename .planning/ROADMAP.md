@@ -35,7 +35,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — Security fixes: derivePublicState, deck strip, host assignment, double-auction faithful rules, reconnect round summary
-- [ ] 01-02-PLAN.md — Input validation (Zod 4), startGame consolidation, Supabase/dead code removal, sealed bid tie-breaking fix
+- [x] 01-02-PLAN.md — Input validation (Zod 4), startGame consolidation, Supabase/dead code removal, sealed bid tie-breaking fix
 - [ ] 01-03-PLAN.md — Engine tests (Vitest 4): all five auction types, round-end trigger, tie-breaking, cumulative valuation, pass cycle
 
 ### Phase 2: Aesthetic System Foundation
@@ -134,7 +134,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Engine Hardening & Security | 0/3 | Ready to execute | - |
+| 1. Engine Hardening & Security | 2/3 | In Progress|  |
 | 2. Aesthetic System Foundation | 0/4 | Not started | - |
 | 3. Core Sim Loop | 0/4 | Not started | - |
 | 4. Sim Depth — Relationships, Landlord, Drugs | 0/4 | Not started | - |
