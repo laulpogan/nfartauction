@@ -31,12 +31,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A non-auctioneer player's attempt to play the second card in a double auction is rejected by the server
   4. Submitting a malformed or out-of-range WebSocket message is rejected before it reaches any engine function
   5. The engine test suite runs green, covering all five auction types, cumulative valuation across rounds, round-end trigger, and sealed-bid tie-breaking
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: Security fixes — derivePublicState, deck strip, host assignment
-- [ ] 01-02: Input validation, startGame consolidation, Supabase removal
-- [ ] 01-03: Engine tests (Vitest 4) — all five auction types, edge cases, reconnect
+- [ ] 01-01-PLAN.md — Security fixes: derivePublicState, deck strip, host assignment, double-auction faithful rules, reconnect round summary
+- [ ] 01-02-PLAN.md — Input validation (Zod 4), startGame consolidation, Supabase/dead code removal, sealed bid tie-breaking fix
+- [ ] 01-03-PLAN.md — Engine tests (Vitest 4): all five auction types, round-end trigger, tie-breaking, cumulative valuation, pass cycle
 
 ### Phase 2: Aesthetic System Foundation
 **Goal**: A complete visual language is in place — every existing and future UI component has the correct zine aesthetic, wall-label typography, and neighborhood accent by default
@@ -134,7 +134,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Engine Hardening & Security | 0/3 | Not started | - |
+| 1. Engine Hardening & Security | 0/3 | Ready to execute | - |
 | 2. Aesthetic System Foundation | 0/4 | Not started | - |
 | 3. Core Sim Loop | 0/4 | Not started | - |
 | 4. Sim Depth — Relationships, Landlord, Drugs | 0/4 | Not started | - |
