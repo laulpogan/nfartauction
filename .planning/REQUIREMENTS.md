@@ -22,9 +22,9 @@
 
 - [x] **AEST-01**: All UI uses the zine visual language: white base, black type, single accent color per neighborhood context
 - [x] **AEST-02**: Five neighborhood accent colors are applied as a design token system (Gallery District blue, Warehouse amber, Flatlands red, Hotel beige, Online flickering)
-- [ ] **AEST-03**: Wall-label typography component renders all game copy — auction results, stat displays, drug inventory — in the same format as gallery labels
-- [ ] **AEST-04**: Auction results render as a printed receipt (not a generic result card)
-- [ ] **AEST-05**: Player stats display as an appraisal form (not a HUD or dashboard)
+- [x] **AEST-03**: Wall-label typography component renders all game copy — auction results, stat displays, drug inventory — in the same format as gallery labels
+- [x] **AEST-04**: Auction results render as a printed receipt (not a generic result card)
+- [x] **AEST-05**: Player stats display as an appraisal form (not a HUD or dashboard)
 - [ ] **AEST-06**: Open auction visual skin: preview night aesthetic with character indicators and raised-hand feedback
 - [ ] **AEST-07**: Once Around auction visual skin: formal dinner aesthetic, players shown in seat order, bids spoken in sequence
 - [ ] **AEST-08**: Sealed bid visual skin: everyone-on-phones aesthetic with a simultaneous reveal animation
@@ -134,9 +134,9 @@
 | ENG-10 | Phase 1 — Engine Hardening & Security | Complete |
 | AEST-01 | Phase 2 — Aesthetic System Foundation | Complete |
 | AEST-02 | Phase 2 — Aesthetic System Foundation | Complete |
-| AEST-03 | Phase 2 — Aesthetic System Foundation | Pending |
-| AEST-04 | Phase 2 — Aesthetic System Foundation | Pending |
-| AEST-05 | Phase 2 — Aesthetic System Foundation | Pending |
+| AEST-03 | Phase 2 — Aesthetic System Foundation | Complete |
+| AEST-04 | Phase 2 — Aesthetic System Foundation | Complete |
+| AEST-05 | Phase 2 — Aesthetic System Foundation | Complete |
 | AEST-06 | Phase 2 — Aesthetic System Foundation | Pending |
 | AEST-07 | Phase 2 — Aesthetic System Foundation | Pending |
 | AEST-08 | Phase 2 — Aesthetic System Foundation | Pending |

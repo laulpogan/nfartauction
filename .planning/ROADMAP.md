@@ -52,7 +52,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — Wave 0 atomic palette swap: @theme tokens, NeighborhoodContext, jsdom test infra, dark→white rewrite of all 5 game components (AEST-01, AEST-02)
-- [ ] 02-02-PLAN.md — Three aesthetic primitives (WallLabel, Receipt, AppraisalForm) + replace round-end + game-over modals with Receipt + thread WallLabel into GameBoard header (AEST-03, AEST-04, AEST-05)
+- [x] 02-02-PLAN.md — Three aesthetic primitives (WallLabel, Receipt, AppraisalForm) + replace round-end + game-over modals with Receipt + thread WallLabel into GameBoard header (AEST-03, AEST-04, AEST-05)
 - [ ] 02-03-PLAN.md — Five auction visual skins dispatched from AuctionPanel + OnlineNeighborhood broken-font wrapper (AEST-06 through AEST-11)
 **UI hint**: yes
 
