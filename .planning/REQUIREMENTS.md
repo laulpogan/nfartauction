@@ -68,9 +68,9 @@
 
 ### End State
 
-- [ ] **END-01**: Game ends after four rounds; highest money total wins
-- [ ] **END-02**: End state renders as a printed appraisal document summarizing the player's gallery legacy (faction mix, neighborhood history, NFT exposure, relationship outcomes)
-- [ ] **END-03**: Leaderboard renders as an auction result receipt (not a conventional score table)
+- [x] **END-01**: Game ends after four rounds; highest money total wins
+- [x] **END-02**: End state renders as a printed appraisal document summarizing the player's gallery legacy (faction mix, neighborhood history, NFT exposure, relationship outcomes)
+- [x] **END-03**: Leaderboard renders as an auction result receipt (not a conventional score table)
 
 ### Deployment
 
@@ -168,9 +168,9 @@
 | NFT-03 | Phase 5 — NFT Layer & End State | Complete |
 | NFT-04 | Phase 5 — NFT Layer & End State | Complete |
 | NFT-05 | Phase 5 — NFT Layer & End State | Complete |
-| END-01 | Phase 5 — NFT Layer & End State | Pending |
-| END-02 | Phase 5 — NFT Layer & End State | Pending |
-| END-03 | Phase 5 — NFT Layer & End State | Pending |
+| END-01 | Phase 5 — NFT Layer & End State | Complete |
+| END-02 | Phase 5 — NFT Layer & End State | Complete |
+| END-03 | Phase 5 — NFT Layer & End State | Complete |
 | DEPLOY-01 | Phase 6 — Deployment & Polish | Pending |
 | DEPLOY-02 | Phase 6 — Deployment & Polish | Pending |
 | DEPLOY-03 | Phase 6 — Deployment & Polish | Pending |
