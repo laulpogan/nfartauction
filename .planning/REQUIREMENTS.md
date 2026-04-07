@@ -74,9 +74,9 @@
 
 ### Deployment
 
-- [ ] **DEPLOY-01**: `app/` subdirectory artifact is deleted before deployment (root is canonical source)
-- [ ] **DEPLOY-02**: Game deploys to a public URL: PartyKit production server + static frontend host (Cloudflare Pages)
-- [ ] **DEPLOY-03**: Production deployment requires no Supabase credentials
+- [x] **DEPLOY-01**: `app/` subdirectory artifact is deleted before deployment (root is canonical source)
+- [x] **DEPLOY-02**: Game deploys to a public URL: PartyKit production server + static frontend host (Cloudflare Pages)
+- [x] **DEPLOY-03**: Production deployment requires no Supabase credentials
 
 ## v2 Requirements
 
@@ -171,9 +171,9 @@
 | END-01 | Phase 5 — NFT Layer & End State | Complete |
 | END-02 | Phase 5 — NFT Layer & End State | Complete |
 | END-03 | Phase 5 — NFT Layer & End State | Complete |
-| DEPLOY-01 | Phase 6 — Deployment & Polish | Pending |
-| DEPLOY-02 | Phase 6 — Deployment & Polish | Pending |
-| DEPLOY-03 | Phase 6 — Deployment & Polish | Pending |
+| DEPLOY-01 | Phase 6 — Deployment & Polish | Complete |
+| DEPLOY-02 | Phase 6 — Deployment & Polish | Complete |
+| DEPLOY-03 | Phase 6 — Deployment & Polish | Complete |
 
 **Coverage:**
 - v1 requirements: 52 total

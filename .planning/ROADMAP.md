@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 3: Core Sim Loop** - Build the sim_day phase, time slot scheduling, stats, shared economy, and the server phase machine
 - [ ] **Phase 4: Sim Depth — Relationships, Landlord, Drugs** - Add named character relationships with decay, the landlord text arc, and the drug inventory system
 - [ ] **Phase 5: NFT Layer & End State** - Unlock the parallel NFT economy at the Coolness threshold and render the game's end state as an appraisal document
-- [ ] **Phase 6: Deployment & Polish** - Clean the repo, configure Cloudflare Pages, deploy to a public URL
+- [x] **Phase 6: Deployment & Polish** - Clean the repo, configure Cloudflare Pages, deploy to a public URL (completed 2026-04-06)
 
 ## Phase Details
 
@@ -121,8 +121,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 06-01: Repo cleanup — delete app/ artifact, verify partykit version pin, remove Supabase env vars
-- [ ] 06-02: Cloudflare Pages config — VITE_PARTYKIT_HOST, _redirects for SPA routing, partykit deploy verification
+- [x] 06-01-PLAN.md — Repo cleanup, Cloudflare Pages config, build verification (DEPLOY-01, DEPLOY-02, DEPLOY-03)
 
 ## Progress
 
@@ -136,4 +135,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Core Sim Loop | 0/4 | Not started | - |
 | 4. Sim Depth — Relationships, Landlord, Drugs | 0/4 | Not started | - |
 | 5. NFT Layer & End State | 0/3 | Not started | - |
-| 6. Deployment & Polish | 0/2 | Not started | - |
+| 6. Deployment & Polish | 1/1 | Complete | 2026-04-06 |

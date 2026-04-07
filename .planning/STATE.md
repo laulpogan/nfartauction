@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-04-07T07:02:22.957Z"
-last_activity: 2026-04-07
+status: complete
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-04-06T00:10:00.000Z"
+last_activity: 2026-04-06
 progress:
   total_phases: 6
-  completed_phases: 5
-  total_plans: 15
-  completed_plans: 15
+  completed_phases: 6
+  total_plans: 16
+  completed_plans: 16
   percent: 100
 ---
 
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-04-06)
 
 ## Current Position
 
-Phase: 1 of 6 (Engine Hardening & Security)
-Plan: 3 of 3 in current phase
-Status: Phase complete — ready for verification
-Last activity: 2026-04-07
+Phase: 6 of 6 (Deployment & Polish)
+Plan: 1 of 1 in current phase
+Status: All phases complete — v1 ready to deploy
+Last activity: 2026-04-06
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P03 | 6min | 2 tasks | 10 files |
 | Phase 05 P01 | 8min | 2 tasks | 12 files |
 | Phase 05 P02 | 10min | 2 tasks | 13 files |
+| Phase 06 P01 | 6min | 4 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,9 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-01: NFT exchange rate formula = 0.5 + (hype/100)*1.5 → range [0.5, 2.0]; unlockThreshold=60; whitelistCost=2
 - [Phase 05]: 05-01: applyNftHypeDrift wired into advanceDay drift parameter; entropy stays in party/server.ts (engine purity preserved)
 - [Phase 05]: 05-01: Coolness threshold-cross detector runs after drug-use; nftWalletUnlocked is server-only writer (T-5-05)
+- [Phase 06]: 06-01: Cloudflare Pages chosen as static host (same CDN as PartyKit Workers, minimizes WebSocket handshake latency)
+- [Phase 06]: 06-01: SPA routing via public/_redirects (`/* /index.html 200`) — Vite copies into dist/ automatically
+- [Phase 06]: 06-01: Build hardened by fixing pre-existing TS errors (erasableSyntaxOnly constructor shorthand + 4 unused-import warnings)
 
 ### Pending Todos
 
@@ -107,6 +111,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-07T06:48:57.505Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-04-06T00:10:00.000Z
+Stopped at: Completed 06-01-PLAN.md
 Resume file: None
