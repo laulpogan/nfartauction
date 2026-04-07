@@ -37,9 +37,9 @@
 - [x] **SIM-01**: Game alternates between `sim_day` and `auction_round` phases, server-authoritative
 - [x] **SIM-02**: Player tracks four personal stats: Money, Coolness, Restedness, Luck
 - [x] **SIM-03**: Three global stats fluctuate by round: Art Market Hotness (auction valuation multiplier), Gentrification Level (rent/travel costs), NFT Hype Cycle (exchange rate)
-- [ ] **SIM-04**: Player allocates a finite set of daily time slots (cannot fill them all in one day)
-- [ ] **SIM-05**: All six slot types are available: gallery work, studio visits, art fair, opening/event, party, sleep
-- [ ] **SIM-06**: Five neighborhoods exist on the map; traveling between zones costs a time slot
+- [x] **SIM-04**: Player allocates a finite set of daily time slots (cannot fill them all in one day)
+- [x] **SIM-05**: All six slot types are available: gallery work, studio visits, art fair, opening/event, party, sleep
+- [x] **SIM-06**: Five neighborhoods exist on the map; traveling between zones costs a time slot
 - [x] **SIM-07**: Sim money and auction money are the same number, visually unified in all displays
 - [x] **SIM-08**: Slot costs and economy constants are exposed as named config constants (no magic numbers), with a dev-mode transaction log for playtesting
 - [x] **SIM-09**: Per-player sim state (stats, inventory, relationships) is private (sent only to the owning player, mirroring the existing hand privacy pattern)
@@ -146,9 +146,9 @@
 | SIM-01 | Phase 3 — Core Sim Loop | Complete |
 | SIM-02 | Phase 3 — Core Sim Loop | Complete |
 | SIM-03 | Phase 3 — Core Sim Loop | Complete |
-| SIM-04 | Phase 3 — Core Sim Loop | Pending |
-| SIM-05 | Phase 3 — Core Sim Loop | Pending |
-| SIM-06 | Phase 3 — Core Sim Loop | Pending |
+| SIM-04 | Phase 3 — Core Sim Loop | Complete |
+| SIM-05 | Phase 3 — Core Sim Loop | Complete |
+| SIM-06 | Phase 3 — Core Sim Loop | Complete |
 | SIM-07 | Phase 3 — Core Sim Loop | Complete |
 | SIM-08 | Phase 3 — Core Sim Loop | Complete |
 | SIM-09 | Phase 3 — Core Sim Loop | Complete |
