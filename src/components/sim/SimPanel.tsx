@@ -11,6 +11,7 @@ import { GlobalStatsBar } from './GlobalStatsBar'
 import { NeighborhoodMap } from './NeighborhoodMap'
 import { SlotPicker } from './SlotPicker'
 import { DayResultReceipt } from './DayResultReceipt'
+import { RelationshipPanel } from './RelationshipPanel'
 
 export interface SimPanelProps {
   game: GameState | null
@@ -66,6 +67,10 @@ export function SimPanel({
 
         <GlobalStatsBar sim={sim} />
         <StatDisplay player={me} playerSim={playerSim} />
+        <RelationshipPanel
+          playerSim={playerSim}
+          roundValues={game?.roundValues ?? null}
+        />
         <NeighborhoodMap
           selected={selectedNeighborhood}
           onSelect={setSelectedNeighborhood}

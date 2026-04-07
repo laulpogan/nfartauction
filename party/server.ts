@@ -12,7 +12,7 @@ import {
   passFixedPrice, placeOpenBid, endOpenAuction, placeOnceAroundBid,
   submitSealedBid, endRound, startGame,
 } from '../src/lib/engine'
-import { resolveSlots, advanceDay } from '../src/lib/sim-engine'
+import { resolveSlots, advanceDay, seedDroppedArtist } from '../src/lib/sim-engine'
 import {
   SIM_CONFIG,
   createInitialPlayerSimState,
@@ -38,6 +38,10 @@ const TimeSlotSchema = z.object({
   id: z.string().min(1).max(64),
   type: SlotTypeSchema,
   neighborhood: NeighborhoodSchema.nullable(),
+  // Phase 4 Plan 01 (T-4-01): client may declare which character this slot
+  // contacts. The engine's updateRelationship silently no-ops on unknown ids,
+  // so this is defense-in-depth validation rather than a trust boundary.
+  targetCharacterId: z.string().min(1).max(64).optional(),
 })
 
 const InboundMessage = z.discriminatedUnion('type', [
@@ -104,6 +108,24 @@ function buildPlayerRecord(session: Session, hand: Card[]): PlayerRecord {
     paintings: session.paintings,
     isHost: session.isHost,
   }
+}
+
+/**
+ * Phase 4 Plan 01 — "The Artist You Shouldn't Have Dropped" seed.
+ *
+ * Server-owned entropy: Math.random lives HERE (not in sim-engine, which is
+ * pure). We pick one of the 5 auction artists uniformly per player at lobby
+ * join time, so each player may get a different dropped artist, and the
+ * engine-side seedDroppedArtist() helper mutates the relationship with
+ * isDroppedArtist=true and score=-50 (RELATIONSHIP_CONFIG.droppedSeedScore).
+ *
+ * T-4-04 mitigation: clients cannot influence this choice — the server does
+ * not accept any input that controls which artist is dropped.
+ */
+function seedFreshPlayerSim(sessionId: string): PlayerSimState {
+  const base = createInitialPlayerSimState(sessionId)
+  const picked = ARTISTS[Math.floor(Math.random() * ARTISTS.length)]
+  return seedDroppedArtist(base, picked)
 }
 
 function sessionToPublicPlayer(session: Session): GameState['players'][0] {
@@ -257,7 +279,7 @@ export default class GameServer implements Party.Server {
           hands: { [sessionId]: [] },
           sessions: { [sessionId]: session },
           sim: createInitialSimState(),
-          playerSim: { [sessionId]: createInitialPlayerSimState(sessionId) },
+          playerSim: { [sessionId]: seedFreshPlayerSim(sessionId) },
         }
       } else {
         // Check if already in session (reconnect)
@@ -287,7 +309,7 @@ export default class GameServer implements Party.Server {
         const session: Session = { sessionId, name, isHost: false, position, money: 100000, paintings: [] }
         this.state.sessions[sessionId] = session
         this.state.hands[sessionId] = []
-        this.state.playerSim[sessionId] = createInitialPlayerSimState(sessionId)
+        this.state.playerSim[sessionId] = seedFreshPlayerSim(sessionId)
         this.state.game = {
           ...this.state.game,
           players: [...this.state.game.players, sessionToPublicPlayer(session)],
@@ -681,17 +703,24 @@ export default class GameServer implements Party.Server {
 
       // Resolve each player's day in position order. resolveSlots is a no-op
       // for empty slot arrays — that's the timeout-with-no-submission path.
+      //
+      // Phase 4 Plan 01: capture the per-player contactedThisDay sets so we
+      // can feed them into advanceDay → decayRelationships. This Map is
+      // local to this function call and never broadcast (T-4-05: server-
+      // derived from engine output, not trusted client input).
       const updatedPlayerSimMap: Record<string, PlayerSimState> = {}
+      const contactedByPlayer = new Map<string, Set<string>>()
       const updatedPlayers = players.map(p => {
         const ps = this.state!.playerSim[p.sessionId]
         if (!ps) return p
-        const { updatedPlayerSim, updatedPlayerMoney } = resolveSlots(
+        const { updatedPlayerSim, updatedPlayerMoney, contactedThisDay } = resolveSlots(
           ps,
           ps.scheduledSlots ?? [],
           sim,
           p,
         )
         updatedPlayerSimMap[p.sessionId] = { ...updatedPlayerSim, scheduledSlots: [] }
+        contactedByPlayer.set(p.sessionId, contactedThisDay)
         // Mirror coolness onto the public player projection so opponents see it.
         return {
           ...p,
@@ -701,10 +730,19 @@ export default class GameServer implements Party.Server {
       })
 
       // Advance global sim state. Drift is deterministically zero for now;
-      // a seeded PRNG will own this in a follow-up plan.
-      const { updatedSim } = advanceDay(sim, Object.values(updatedPlayerSimMap))
+      // a seeded PRNG will own this in a follow-up plan. Decay is per-player
+      // against the contact set built above.
+      const { updatedSim, updatedPlayerSims } = advanceDay(
+        sim,
+        Object.values(updatedPlayerSimMap),
+        { hotness: 0, gent: 0, nft: 0 },
+        contactedByPlayer,
+      )
       this.state.sim = updatedSim
-      this.state.playerSim = { ...this.state.playerSim, ...updatedPlayerSimMap }
+      // Merge the decayed relationship state back into updatedPlayerSimMap.
+      const decayedById: Record<string, PlayerSimState> = {}
+      for (const ps of updatedPlayerSims) decayedById[ps.sessionId] = ps
+      this.state.playerSim = { ...this.state.playerSim, ...decayedById }
 
       // Transition phase: sim_day → auction_round. The engine's round
       // counter (game.round) is the authoritative auction roundNumber.
