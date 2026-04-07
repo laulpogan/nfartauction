@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type {
   GameState, Card, Artist, RoundResult,
   PublicGameState, PublicAuctionState,
-  GamePhase, SimState, PlayerSimState,
+  GamePhase, SimState, PlayerSimState, TimeSlot,
 } from '../src/types/game'
 import { ARTISTS } from '../src/types/game'
 import {
@@ -17,12 +17,19 @@ import {
   advanceDay,
   seedDroppedArtist,
   progressLandlord,
+  addDrugItem,
+  removeDrugItem,
+  applyDrugEffects,
+  accumulateRisk,
 } from '../src/lib/sim-engine'
 import {
   SIM_CONFIG,
+  DRUG_CONFIG,
+  DRUG_DEFINITIONS,
   createInitialPlayerSimState,
   createInitialSimState,
 } from '../src/lib/sim-config'
+import type { DrugItemKind } from '../src/types/game'
 import type { PlayerRecord } from '../src/types/game'
 
 // ─── Inbound message schema (ENG-05) ──────────────────────────────────────────
@@ -715,9 +722,14 @@ export default class GameServer implements Party.Server {
       // derived from engine output, not trusted client input).
       const updatedPlayerSimMap: Record<string, PlayerSimState> = {}
       const contactedByPlayer = new Map<string, Set<string>>()
+      // Phase 4 Plan 03: capture per-player day plan BEFORE resolveSlots
+      // clears scheduledSlots, so the acquisition/use passes below can
+      // re-inspect the plan for flatlands/hotel/party slots.
+      const submittedPlansBySession = new Map<string, TimeSlot[]>()
       const updatedPlayers = players.map(p => {
         const ps = this.state!.playerSim[p.sessionId]
         if (!ps) return p
+        submittedPlansBySession.set(p.sessionId, ps.scheduledSlots ?? [])
         const { updatedPlayerSim, updatedPlayerMoney, contactedThisDay } = resolveSlots(
           ps,
           ps.scheduledSlots ?? [],
@@ -734,6 +746,64 @@ export default class GameServer implements Party.Server {
         }
       })
 
+      // ── Phase 4 Plan 03: drug acquisition rolls ───────────────────────
+      //
+      // For each flatlands/hotel slot in the submitted plan, roll
+      // Math.random() < DRUG_CONFIG.acquisitionProbability[neighborhood].
+      // Entropy stays server-side — the pure engine never touches
+      // Math.random. On a hit, the server picks a uniform DrugItemKind,
+      // generates a crypto.randomUUID id, and calls addDrugItem.
+      //
+      // T-4-12 mitigation: clients cannot inject drugs via SUBMIT_SLOTS —
+      // the Zod schema has no drug fields, and addDrugItem is only called
+      // here, inside advanceFromSimDay.
+      const DRUG_KINDS = Object.keys(DRUG_DEFINITIONS) as DrugItemKind[]
+      for (const p of players) {
+        let ps = updatedPlayerSimMap[p.sessionId]
+        if (!ps) continue
+        const plan = submittedPlansBySession.get(p.sessionId) ?? []
+        for (const s of plan) {
+          if (s.neighborhood === 'flatlands' || s.neighborhood === 'hotel') {
+            const probability = DRUG_CONFIG.acquisitionProbability[s.neighborhood]
+            if (Math.random() < probability) {
+              const kind = DRUG_KINDS[Math.floor(Math.random() * DRUG_KINDS.length)]
+              const id =
+                typeof crypto !== 'undefined' && 'randomUUID' in crypto
+                  ? crypto.randomUUID()
+                  : `drug-${Date.now()}-${Math.floor(Math.random() * 1e9)}`
+              ps = addDrugItem(ps, kind, id)
+            }
+          }
+        }
+        updatedPlayerSimMap[p.sessionId] = ps
+      }
+
+      // ── Phase 4 Plan 03: party-slot drug use ──────────────────────────
+      //
+      // For each 'party' slot in the submitted plan, if the player has at
+      // least one drug item, consume drugs[0]: apply its effects then
+      // remove it by id. The coolness change is mirrored onto the
+      // PublicPlayer entry the same way resolveSlots already does, so
+      // opponents see the party-fuelled coolness bump without seeing the
+      // drug inventory itself (T-4-14: drugs stay in PlayerSimState).
+      for (let i = 0; i < players.length; i++) {
+        const p = players[i]
+        let ps = updatedPlayerSimMap[p.sessionId]
+        if (!ps) continue
+        const plan = submittedPlansBySession.get(p.sessionId) ?? []
+        let coolnessMirror = updatedPlayers[i].coolness
+        for (const s of plan) {
+          if (s.type === 'party' && ps.drugs.length > 0) {
+            const item = ps.drugs[0]
+            const { updatedPlayerSim: afterEffects } = applyDrugEffects(ps, item.kind)
+            ps = removeDrugItem(afterEffects, item.id)
+            coolnessMirror = ps.coolness
+          }
+        }
+        updatedPlayerSimMap[p.sessionId] = ps
+        updatedPlayers[i] = { ...updatedPlayers[i], coolness: coolnessMirror }
+      }
+
       // Phase 4 Plan 02: landlord arc progression. Runs per player AFTER
       // the resolveSlots loop but BEFORE advanceDay, so the landlordStage
       // advance is visible in the same sim_day → auction_round transition
@@ -746,6 +816,19 @@ export default class GameServer implements Party.Server {
         if (!ps) continue
         const { updatedPlayerSim: afterLandlord } = progressLandlord(ps, p.prestige)
         updatedPlayerSimMap[p.sessionId] = afterLandlord
+      }
+
+      // ── Phase 4 Plan 03: per-player risk accumulation ─────────────────
+      //
+      // Runs AFTER progressLandlord and BEFORE advanceDay. Carrying more
+      // than DRUG_CONFIG.riskThreshold units bumps risk by riskPerDay
+      // (clamped to 100). An empty inventory decays risk by 1. Pure
+      // function; accumulateRisk is the only writer for the risk field
+      // (T-4-15 mitigation).
+      for (const p of players) {
+        const ps = updatedPlayerSimMap[p.sessionId]
+        if (!ps) continue
+        updatedPlayerSimMap[p.sessionId] = accumulateRisk(ps)
       }
 
       // Advance global sim state. Drift is deterministically zero for now;
