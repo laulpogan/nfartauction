@@ -103,12 +103,11 @@ Plans:
   3. NFT activity generates faction notifications in wall-label format visible to the relevant players
   4. After round four, every player sees a printed appraisal document summarizing their gallery legacy — faction mix, neighborhoods visited, NFT exposure, relationship outcomes
   5. The leaderboard renders as an auction receipt, not a table — the winning player is declared in receipt format
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: NFT unlock — Coolness threshold check, nftWallet state, exchange rate volatility, CONVERT_NFT action
-- [ ] 05-02: NFT faction reactions — Sculptors notification, Social/Political denouncement in wall-label format
-- [ ] 05-03: End state — appraisal document template, leaderboard as auction receipt
+- [ ] 05-01-PLAN.md — NFT layer: Coolness threshold unlock, nftWallet/heldNfts state, CONVERT_NFT + PURCHASE_NFT_WHITELIST handlers, faction reactions, NftPanel UI in OnlineNeighborhood wrapper
+- [ ] 05-02-PLAN.md — End state: round-4 game_over transition, computeFinalAppraisal pure function, APPRAISAL_TEMPLATES, EndStateAppraisal component replacing GameOverModal body, receipt-format leaderboard
 **UI hint**: yes
 
 ### Phase 6: Deployment & Polish
