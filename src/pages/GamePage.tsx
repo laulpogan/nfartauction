@@ -2,6 +2,7 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { useGame } from '../hooks/useGame'
 import { GameBoard } from '../components/game/GameBoard'
 import { WaitingRoom } from '../components/lobby/WaitingRoom'
+import { NeighborhoodProvider } from '../contexts/NeighborhoodContext'
 
 export function GamePage() {
   const { code } = useParams<{ code: string }>()
@@ -16,25 +17,30 @@ export function GamePage() {
 
   if (!connected && !game) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-4 animate-bounce">🎨</div>
-          <p className="text-zinc-400">Connecting to room <span className="text-white font-bold">{code?.toUpperCase()}</span>...</p>
+      <NeighborhoodProvider neighborhood="gallery">
+        <div className="min-h-screen bg-paper text-ink font-label flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-ink-soft uppercase tracking-[0.18em]">
+              Connecting to room <span className="text-ink font-bold">{code?.toUpperCase()}</span>...
+            </p>
+          </div>
         </div>
-      </div>
+      </NeighborhoodProvider>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <p className="text-red-400 text-lg">{error}</p>
-          <button onClick={() => navigate('/')} className="text-zinc-400 underline text-sm">
-            Return to lobby
-          </button>
+      <NeighborhoodProvider neighborhood="gallery">
+        <div className="min-h-screen bg-paper text-ink font-label flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <p className="text-[var(--color-stamp)] text-lg uppercase tracking-[0.18em]">{error}</p>
+            <button onClick={() => navigate('/')} className="text-ink-soft underline text-sm uppercase tracking-[0.18em]">
+              Return to lobby
+            </button>
+          </div>
         </div>
-      </div>
+      </NeighborhoodProvider>
     )
   }
 

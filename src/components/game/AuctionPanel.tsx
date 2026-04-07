@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { clsx } from 'clsx'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { GameState } from '../../types/game'
-import { ARTIST_NAMES, ARTIST_COLORS, AUCTION_TYPE_NAMES, AUCTION_TYPE_ICONS } from '../../types/game'
+import { ARTIST_NAMES, AUCTION_TYPE_NAMES } from '../../types/game'
 import { ArtCard } from './ArtCard'
 import { Button } from '../ui/Button'
 
@@ -40,7 +40,6 @@ export function AuctionPanel({
   if (!auction) return null
 
   const auctioneer = game.players[auction.auctioneerIdx]
-  const colors = ARTIST_COLORS[auction.cards[0]?.artist]
   const hasSubmittedSealed = auction.sealedBids[myPlayerIdx] !== undefined
 
   const isOnceAroundMyTurn =
@@ -59,27 +58,22 @@ export function AuctionPanel({
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className={clsx(
-          'rounded-2xl border-2 p-4',
-          colors?.border ?? 'border-zinc-700',
-          'bg-zinc-900/90 backdrop-blur',
-        )}
+        className="rounded-2xl border-2 border-[var(--color-accent)] p-4 bg-paper"
       >
         {/* Auction header */}
         <div className="flex items-start justify-between mb-3">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-2xl">{AUCTION_TYPE_ICONS[auction.auctionType]}</span>
               <div>
-                <div className="text-white font-bold">{AUCTION_TYPE_NAMES[auction.auctionType]} Auction</div>
-                <div className="text-xs text-zinc-400">
-                  Auctioneer: <span className="text-zinc-200 font-semibold">{auctioneer?.displayName}</span>
+                <div className="text-ink font-bold uppercase tracking-[0.18em]">{AUCTION_TYPE_NAMES[auction.auctionType]} Auction</div>
+                <div className="text-xs text-ink-soft uppercase tracking-[0.18em]">
+                  Auctioneer: <span className="text-ink font-semibold">{auctioneer?.displayName}</span>
                 </div>
               </div>
             </div>
           </div>
           {auction.status === 'waiting_second' && (
-            <span className="bg-amber-500/20 text-amber-400 text-xs px-2 py-1 rounded-full">
+            <span className="bg-paper border border-[var(--color-accent)] text-[var(--color-accent)] text-xs px-2 py-1 rounded-full uppercase tracking-[0.18em]">
               Waiting for 2nd card
             </span>
           )}
@@ -94,9 +88,9 @@ export function AuctionPanel({
 
         {/* Status: waiting for second card (double auction) */}
         {auction.status === 'waiting_second' && (
-          <div className="bg-amber-950/40 border border-amber-800/40 rounded-xl p-3">
-            <p className="text-amber-300 text-sm">
-              Double auction! Play a second <strong>{ARTIST_NAMES[auction.cards[0].artist]}</strong> card from your hand to complete this lot.
+          <div className="bg-paper border border-rule rounded-xl p-3">
+            <p className="text-ink text-sm">
+              Double auction. Play a second <strong>{ARTIST_NAMES[auction.cards[0].artist]}</strong> card from your hand to complete this lot.
             </p>
           </div>
         )}
@@ -104,14 +98,14 @@ export function AuctionPanel({
         {/* Set fixed price */}
         {auction.status === 'set_price' && isAuctioneer && (
           <div className="space-y-2">
-            <p className="text-zinc-300 text-sm">Set your asking price:</p>
+            <p className="text-ink text-sm uppercase tracking-[0.18em]">Set your asking price:</p>
             <div className="flex gap-2">
               <input
                 type="number"
                 value={fixedPriceInput}
                 onChange={e => setFixedPriceInput(e.target.value)}
                 placeholder="e.g. 15000"
-                className="flex-1 bg-zinc-800 border border-zinc-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+                className="flex-1 bg-paper border border-ink rounded-lg px-3 py-2 text-ink text-sm focus:outline-none focus:border-[var(--color-accent)]"
                 min={0}
               />
               <Button
@@ -132,10 +126,10 @@ export function AuctionPanel({
         {auction.auctionType === 'fixed_price' && auction.status === 'active' && auction.fixedPrice !== null && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <span className="text-zinc-400 text-sm">Asking price:</span>
-              <span className="text-white font-bold text-lg">{formatMoney(auction.fixedPrice)}</span>
+              <span className="text-ink-soft text-sm uppercase tracking-[0.18em]">Asking price:</span>
+              <span className="text-ink font-bold text-lg">{formatMoney(auction.fixedPrice)}</span>
             </div>
-            <div className="text-xs text-zinc-500">
+            <div className="text-xs text-ink-soft uppercase tracking-[0.18em]">
               {game.players[auction.onceAroundCurrentIdx]?.displayName}'s turn
             </div>
             {fixedPriceMyTurn && (
@@ -151,7 +145,7 @@ export function AuctionPanel({
               </div>
             )}
             {fixedPriceMyTurn && myMoney < (auction.fixedPrice ?? 0) && (
-              <p className="text-red-400 text-xs">Not enough money</p>
+              <p className="text-[var(--color-stamp)] text-xs uppercase tracking-[0.18em]">Not enough money</p>
             )}
           </div>
         )}
@@ -161,14 +155,14 @@ export function AuctionPanel({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-zinc-400 text-sm">Current bid: </span>
-                <span className="text-white font-bold text-xl">
+                <span className="text-ink-soft text-sm uppercase tracking-[0.18em]">Current bid: </span>
+                <span className="text-ink font-bold text-xl">
                   {auction.currentBid > 0 ? formatMoney(auction.currentBid) : 'No bids yet'}
                 </span>
               </div>
               {auction.leadingBidderIdx !== null && (
-                <span className="text-sm text-zinc-400">
-                  Leading: <span className="text-green-400 font-semibold">{game.players[auction.leadingBidderIdx]?.displayName}</span>
+                <span className="text-sm text-ink-soft uppercase tracking-[0.18em]">
+                  Leading: <span className="text-ink font-semibold">{game.players[auction.leadingBidderIdx]?.displayName}</span>
                 </span>
               )}
             </div>
@@ -179,7 +173,7 @@ export function AuctionPanel({
                 value={bidAmount}
                 onChange={e => setBidAmount(e.target.value)}
                 placeholder={`Min ${auction.currentBid + 1}`}
-                className="flex-1 bg-zinc-800 border border-zinc-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+                className="flex-1 bg-paper border border-ink rounded-lg px-3 py-2 text-ink text-sm focus:outline-none focus:border-[var(--color-accent)]"
                 min={auction.currentBid + 1}
               />
               <Button
@@ -200,7 +194,7 @@ export function AuctionPanel({
                 className="w-full"
                 onClick={onEndOpenAuction}
               >
-                🔨 Hammer Down — Sold!
+                HAMMER DOWN — SOLD
               </Button>
             )}
           </div>
@@ -211,8 +205,8 @@ export function AuctionPanel({
           <div className="space-y-3">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-zinc-400 text-sm">Highest bid:</span>
-                <span className="text-white font-bold">
+                <span className="text-ink-soft text-sm uppercase tracking-[0.18em]">Highest bid:</span>
+                <span className="text-ink font-bold">
                   {Object.values(auction.onceAroundBids).filter(b => b !== null).length > 0
                     ? formatMoney(Math.max(...(Object.values(auction.onceAroundBids).filter(b => b !== null) as number[])))
                     : 'No bids yet'}
@@ -226,12 +220,12 @@ export function AuctionPanel({
                   return (
                     <div key={p.id} className={clsx(
                       'flex-1 rounded-lg py-1 px-1 text-center text-xs',
-                      isCurrent ? 'bg-indigo-800/60 border border-indigo-600' : 'bg-zinc-800',
+                      isCurrent ? 'border border-[var(--color-accent)] bg-paper' : 'bg-paper border border-rule',
                     )}>
-                      <div className={clsx('font-semibold truncate', i === myPlayerIdx ? 'text-amber-300' : 'text-zinc-300')}>
+                      <div className={clsx('font-semibold truncate uppercase tracking-[0.18em]', i === myPlayerIdx ? 'text-[var(--color-accent)]' : 'text-ink')}>
                         {p.displayName.split(' ')[0]}
                       </div>
-                      <div className="text-zinc-500">
+                      <div className="text-ink-soft">
                         {bid === undefined
                           ? isCurrent ? '...' : '—'
                           : bid === null ? 'Pass'
@@ -250,7 +244,7 @@ export function AuctionPanel({
                   value={bidAmount}
                   onChange={e => setBidAmount(e.target.value)}
                   placeholder="Your bid"
-                  className="flex-1 bg-zinc-800 border border-zinc-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+                  className="flex-1 bg-paper border border-ink rounded-lg px-3 py-2 text-ink text-sm focus:outline-none focus:border-[var(--color-accent)]"
                   min={1}
                 />
                 <Button
@@ -267,7 +261,7 @@ export function AuctionPanel({
               </div>
             )}
             {!isOnceAroundMyTurn && auction.onceAroundBids[myPlayerIdx] === undefined && (
-              <p className="text-zinc-500 text-sm">Waiting for {game.players[auction.onceAroundCurrentIdx]?.displayName}...</p>
+              <p className="text-ink-soft text-sm uppercase tracking-[0.18em]">Waiting for {game.players[auction.onceAroundCurrentIdx]?.displayName}...</p>
             )}
           </div>
         )}
@@ -275,7 +269,7 @@ export function AuctionPanel({
         {/* Sealed bid */}
         {auction.auctionType === 'sealed_bid' && auction.status === 'active' && (
           <div className="space-y-3">
-            <p className="text-zinc-300 text-sm">
+            <p className="text-ink text-sm uppercase tracking-[0.18em]">
               Submit your sealed bid — highest wins. {Object.keys(auction.sealedBids).length}/{game.players.length} submitted.
             </p>
             {/* Show who has / hasn't submitted (not amounts) */}
@@ -285,13 +279,13 @@ export function AuctionPanel({
                 return (
                   <div key={p.id} className={clsx(
                     'flex-1 rounded-lg py-1 px-1 text-center text-xs',
-                    submitted ? 'bg-green-900/40 border border-green-700/50' : 'bg-zinc-800',
+                    submitted ? 'bg-paper border border-ink' : 'bg-paper border border-rule',
                   )}>
-                    <div className={clsx('font-semibold truncate', i === myPlayerIdx ? 'text-amber-300' : 'text-zinc-300')}>
+                    <div className={clsx('font-semibold truncate uppercase tracking-[0.18em]', i === myPlayerIdx ? 'text-[var(--color-accent)]' : 'text-ink')}>
                       {p.displayName.split(' ')[0]}
                     </div>
-                    <div className={submitted ? 'text-green-400' : 'text-zinc-600'}>
-                      {submitted ? '✓' : '...'}
+                    <div className={submitted ? 'text-ink' : 'text-ink-soft'}>
+                      {submitted ? 'IN' : '...'}
                     </div>
                   </div>
                 )
@@ -305,7 +299,7 @@ export function AuctionPanel({
                   value={sealedBidInput}
                   onChange={e => setSealedBidInput(e.target.value)}
                   placeholder="Your secret bid"
-                  className="flex-1 bg-zinc-800 border border-zinc-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+                  className="flex-1 bg-paper border border-ink rounded-lg px-3 py-2 text-ink text-sm focus:outline-none focus:border-[var(--color-accent)]"
                   min={0}
                 />
                 <Button
@@ -325,15 +319,15 @@ export function AuctionPanel({
               </div>
             )}
             {(hasSubmittedSealed || sealedBidSubmitted) && (
-              <p className="text-green-400 text-sm">Bid submitted — waiting for others...</p>
+              <p className="text-ink text-sm uppercase tracking-[0.18em]">Bid submitted — waiting for others...</p>
             )}
           </div>
         )}
 
         {/* Completed */}
         {auction.status === 'completed' && (
-          <div className="bg-green-950/40 border border-green-800/40 rounded-xl p-3">
-            <p className="text-green-300 text-sm font-semibold">
+          <div className="bg-paper border border-rule rounded-xl p-3">
+            <p className="text-ink text-sm font-semibold uppercase tracking-[0.18em]">
               Sold to {game.players[auction.winnerIdx ?? 0]?.displayName} for {formatMoney(auction.finalPrice ?? 0)}
             </p>
           </div>

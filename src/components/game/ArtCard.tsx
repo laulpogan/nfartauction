@@ -1,7 +1,7 @@
 import { clsx } from 'clsx'
 import { motion } from 'framer-motion'
 import type { Card } from '../../types/game'
-import { ARTIST_COLORS, ARTIST_NAMES, AUCTION_TYPE_ICONS, AUCTION_TYPE_NAMES } from '../../types/game'
+import { ARTIST_NAMES, AUCTION_TYPE_NAMES } from '../../types/game'
 
 interface ArtCardProps {
   card: Card
@@ -13,14 +13,14 @@ interface ArtCardProps {
 }
 
 const ART_PATTERNS = [
-  '⬟⬠⬟⬠',
-  '◈◉◈◉',
-  '▲△▲△',
-  '❋✦❋✦',
-  '◐◑◐◑',
-  '⌘⊛⌘⊛',
-  '✶✷✶✷',
-  '⬡⬢⬡⬢',
+  '///',
+  '|||',
+  '---',
+  '...',
+  '+++',
+  '===',
+  '***',
+  'xxx',
 ]
 
 function hashString(s: string): number {
@@ -29,8 +29,12 @@ function hashString(s: string): number {
   return Math.abs(h)
 }
 
+/*
+ * Phase 2 zine ArtCard: paper base, ink type, black border for all cards.
+ * Artist identity is encoded via typography + repeated glyph pattern, not hue.
+ * The neighborhood accent appears only on the selection ring.
+ */
 export function ArtCard({ card, onClick, selected, disabled, size = 'md', faceDown }: ArtCardProps) {
-  const colors = ARTIST_COLORS[card.artist]
   const pattern = ART_PATTERNS[hashString(card.id) % ART_PATTERNS.length]
   const patternLine = Array(3).fill(pattern).join(' ')
 
@@ -44,11 +48,10 @@ export function ArtCard({ card, onClick, selected, disabled, size = 'md', faceDo
     return (
       <div className={clsx(
         sizeClasses[size],
-        'rounded-xl bg-zinc-800 border-2 border-zinc-600',
+        'rounded-xl bg-paper border-2 border-ink',
         'flex items-center justify-center',
-        'shadow-lg',
       )}>
-        <span className="text-zinc-500 text-2xl">🎨</span>
+        <span className="text-ink-soft text-2xl font-bold">?</span>
       </div>
     )
   }
@@ -61,25 +64,24 @@ export function ArtCard({ card, onClick, selected, disabled, size = 'md', faceDo
       whileTap={onClick && !disabled ? { scale: 0.97 } : {}}
       className={clsx(
         sizeClasses[size],
-        `bg-gradient-to-b ${colors.card}`,
-        'rounded-xl border-2 shadow-lg flex flex-col overflow-hidden cursor-pointer',
+        'bg-paper rounded-xl border-2 flex flex-col overflow-hidden cursor-pointer',
         'transition-all duration-150',
-        selected ? `${colors.border} border-2 ring-2 ring-offset-2 ring-offset-zinc-900 ring-amber-400` : `border-zinc-700`,
+        selected ? 'border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]' : 'border-ink',
         disabled ? 'opacity-50 cursor-not-allowed' : '',
         !onClick ? 'cursor-default' : '',
       )}
     >
       {/* Header */}
-      <div className={clsx('px-1.5 py-1 flex items-center justify-between', colors.bg)}>
-        <span className={clsx('font-bold leading-none', colors.text, size === 'sm' ? 'text-[9px]' : 'text-xs')}>
-          {AUCTION_TYPE_ICONS[card.auctionType]}
+      <div className="px-1.5 py-1 flex items-center justify-between border-b border-rule">
+        <span className={clsx('font-bold leading-none text-ink uppercase tracking-[0.18em]', size === 'sm' ? 'text-[7px]' : 'text-[9px]')}>
+          {AUCTION_TYPE_NAMES[card.auctionType]}
         </span>
-        {selected && <span className="text-amber-400 text-xs">✓</span>}
+        {selected && <span className="text-[var(--color-accent)] text-xs font-bold">•</span>}
       </div>
 
       {/* Art area */}
       <div className="flex-1 flex flex-col items-center justify-center px-1 py-1">
-        <div className={clsx('font-mono opacity-30 leading-relaxed text-center', colors.text, size === 'sm' ? 'text-[8px]' : 'text-[10px]')}>
+        <div className={clsx('font-mono opacity-40 leading-relaxed text-center text-ink', size === 'sm' ? 'text-[8px]' : 'text-[10px]')}>
           {patternLine}<br />
           {patternLine}<br />
           {patternLine}
@@ -87,12 +89,9 @@ export function ArtCard({ card, onClick, selected, disabled, size = 'md', faceDo
       </div>
 
       {/* Footer */}
-      <div className={clsx('px-1.5 py-1', colors.bg)}>
-        <div className={clsx('font-bold truncate leading-none', colors.text, size === 'sm' ? 'text-[8px]' : 'text-[9px]')}>
+      <div className="px-1.5 py-1 border-t border-rule">
+        <div className={clsx('font-bold truncate leading-none text-ink uppercase tracking-[0.18em]', size === 'sm' ? 'text-[7px]' : 'text-[9px]')}>
           {ARTIST_NAMES[card.artist]}
-        </div>
-        <div className="text-zinc-400 leading-none mt-0.5" style={{ fontSize: '8px' }}>
-          {AUCTION_TYPE_NAMES[card.auctionType]}
         </div>
       </div>
     </motion.button>

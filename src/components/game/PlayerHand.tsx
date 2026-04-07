@@ -51,23 +51,23 @@ export function PlayerHand({ hand, game, isMyTurn, myPlayerIdx, onPlayCard, onPl
   }
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+    <div className="bg-paper border border-rule rounded-2xl p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-zinc-400 text-xs font-semibold uppercase tracking-widest">
+        <h3 className="text-ink-soft text-xs font-semibold uppercase tracking-[0.18em]">
           Your Hand ({hand.length} cards)
         </h3>
         {waitingForSecond && !isMyAuction && (
-          <span className="text-amber-400 text-xs bg-amber-900/30 px-2 py-0.5 rounded-full">
+          <span className="text-[var(--color-accent)] text-xs bg-paper border border-[var(--color-accent)] px-2 py-0.5 rounded-full uppercase tracking-[0.18em]">
             Complete double? Play a {ARTIST_NAMES[secondCardArtist!]}
           </span>
         )}
         {waitingForSecond && isMyAuction && (
-          <span className="text-amber-400 text-xs bg-amber-900/30 px-2 py-0.5 rounded-full">
+          <span className="text-[var(--color-accent)] text-xs bg-paper border border-[var(--color-accent)] px-2 py-0.5 rounded-full uppercase tracking-[0.18em]">
             Play your 2nd {ARTIST_NAMES[secondCardArtist!]} card
           </span>
         )}
         {!waitingForSecond && isMyTurn && !auction && (
-          <span className="text-green-400 text-xs bg-green-900/30 px-2 py-0.5 rounded-full animate-pulse">
+          <span className="text-ink text-xs bg-paper border border-ink px-2 py-0.5 rounded-full uppercase tracking-[0.18em]">
             Your turn — play a card
           </span>
         )}
@@ -104,7 +104,7 @@ export function PlayerHand({ hand, game, isMyTurn, myPlayerIdx, onPlayCard, onPl
           })}
         </AnimatePresence>
         {hand.length === 0 && (
-          <p className="text-zinc-600 text-sm self-center">No cards in hand</p>
+          <p className="text-ink-soft text-sm self-center uppercase tracking-[0.18em]">No cards in hand</p>
         )}
       </div>
 
@@ -116,7 +116,7 @@ export function PlayerHand({ hand, game, isMyTurn, myPlayerIdx, onPlayCard, onPl
           animate={{ opacity: 1, y: 0 }}
         >
           <div className="flex-1">
-            <p className="text-zinc-300 text-sm">
+            <p className="text-ink text-sm uppercase tracking-[0.18em]">
               {waitingForSecond
                 ? `Complete double with ${ARTIST_NAMES[selectedCard.artist]}`
                 : `Auction ${ARTIST_NAMES[selectedCard.artist]}`}
@@ -135,7 +135,7 @@ export function PlayerHand({ hand, game, isMyTurn, myPlayerIdx, onPlayCard, onPl
       )}
 
       {!isMyTurn && !waitingForSecond && (
-        <p className="text-zinc-600 text-xs mt-2">
+        <p className="text-ink-soft text-xs mt-2 uppercase tracking-[0.18em]">
           Waiting for {game.players[game.currentPlayerIdx]?.displayName}...
         </p>
       )}
