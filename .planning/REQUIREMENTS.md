@@ -60,11 +60,11 @@
 
 ### NFT Layer
 
-- [ ] **NFT-01**: NFT panel unlocks when a player's Coolness crosses a configurable threshold (delivered as an in-game DM from a named character)
-- [ ] **NFT-02**: NFT economy runs as a parallel wallet (`nftWallet`) separate from the main money pool
-- [ ] **NFT-03**: Exchange rate between NFT wallet and main money fluctuates per sim day, tracked by the NFT Hype Cycle global stat
-- [ ] **NFT-04**: Player can explicitly convert NFT wallet value to main money (no automatic flow between economies)
-- [ ] **NFT-05**: NFT activity generates faction reactions: Sculptors receive an outraged notification; Social/Political artists generate a public denouncement notification in wall-label format
+- [x] **NFT-01**: NFT panel unlocks when a player's Coolness crosses a configurable threshold (delivered as an in-game DM from a named character)
+- [x] **NFT-02**: NFT economy runs as a parallel wallet (`nftWallet`) separate from the main money pool
+- [x] **NFT-03**: Exchange rate between NFT wallet and main money fluctuates per sim day, tracked by the NFT Hype Cycle global stat
+- [x] **NFT-04**: Player can explicitly convert NFT wallet value to main money (no automatic flow between economies)
+- [x] **NFT-05**: NFT activity generates faction reactions: Sculptors receive an outraged notification; Social/Political artists generate a public denouncement notification in wall-label format
 
 ### End State
 
@@ -163,11 +163,11 @@
 | DEPTH-08 | Phase 4 — Sim Depth | Complete |
 | DEPTH-09 | Phase 4 — Sim Depth | Complete |
 | DEPTH-10 | Phase 4 — Sim Depth | Complete |
-| NFT-01 | Phase 5 — NFT Layer & End State | Pending |
-| NFT-02 | Phase 5 — NFT Layer & End State | Pending |
-| NFT-03 | Phase 5 — NFT Layer & End State | Pending |
-| NFT-04 | Phase 5 — NFT Layer & End State | Pending |
-| NFT-05 | Phase 5 — NFT Layer & End State | Pending |
+| NFT-01 | Phase 5 — NFT Layer & End State | Complete |
+| NFT-02 | Phase 5 — NFT Layer & End State | Complete |
+| NFT-03 | Phase 5 — NFT Layer & End State | Complete |
+| NFT-04 | Phase 5 — NFT Layer & End State | Complete |
+| NFT-05 | Phase 5 — NFT Layer & End State | Complete |
 | END-01 | Phase 5 — NFT Layer & End State | Pending |
 | END-02 | Phase 5 — NFT Layer & End State | Pending |
 | END-03 | Phase 5 — NFT Layer & End State | Pending |

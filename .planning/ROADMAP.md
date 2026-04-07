@@ -106,7 +106,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — NFT layer: Coolness threshold unlock, nftWallet/heldNfts state, CONVERT_NFT + PURCHASE_NFT_WHITELIST handlers, faction reactions, NftPanel UI in OnlineNeighborhood wrapper
+- [x] 05-01-PLAN.md — NFT layer: Coolness threshold unlock, nftWallet/heldNfts state, CONVERT_NFT + PURCHASE_NFT_WHITELIST handlers, faction reactions, NftPanel UI in OnlineNeighborhood wrapper
 - [ ] 05-02-PLAN.md — End state: round-4 game_over transition, computeFinalAppraisal pure function, APPRAISAL_TEMPLATES, EndStateAppraisal component replacing GameOverModal body, receipt-format leaderboard
 **UI hint**: yes
 

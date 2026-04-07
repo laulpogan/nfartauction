@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-04-07T06:26:10.684Z"
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-04-07T06:48:57.508Z"
 last_activity: 2026-04-07
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 13
-  completed_plans: 13
-  percent: 100
+  total_plans: 15
+  completed_plans: 14
+  percent: 93
 ---
 
 # Project State
@@ -65,6 +65,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P01 | 7min | 2 tasks | 9 files |
 | Phase 04 P02 | ~5min | 2 tasks | 9 files |
 | Phase 04 P03 | 6min | 2 tasks | 10 files |
+| Phase 05 P01 | 8min | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,9 @@ Recent decisions affecting current work:
 - [Phase 04]: 04-03: DRUG_CONFIG tunables (threshold=5, riskPerDay=8, flatlands=0.35, hotel=0.20) placed in sim-config for one-line tuning
 - [Phase 04]: 04-03: server-owned entropy boundary (Math.random + crypto.randomUUID in party/server.ts); pure engine receives pre-generated ids
 - [Phase 04]: 04-03: drugs render via AppraisalForm with data-drug-id sentinel on displayMeta — same visual layout as paintings
+- [Phase 05]: 05-01: NFT exchange rate formula = 0.5 + (hype/100)*1.5 → range [0.5, 2.0]; unlockThreshold=60; whitelistCost=2
+- [Phase 05]: 05-01: applyNftHypeDrift wired into advanceDay drift parameter; entropy stays in party/server.ts (engine purity preserved)
+- [Phase 05]: 05-01: Coolness threshold-cross detector runs after drug-use; nftWalletUnlocked is server-only writer (T-5-05)
 
 ### Pending Todos
 
@@ -102,6 +106,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-07T06:26:02.398Z
-Stopped at: Completed 04-03-PLAN.md
+Last session: 2026-04-07T06:48:57.505Z
+Stopped at: Completed 05-01-PLAN.md
 Resume file: None
