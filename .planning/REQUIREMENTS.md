@@ -47,16 +47,16 @@
 
 ### Sim Depth — Relationships, Landlord, Drugs
 
-- [ ] **DEPTH-01**: Named artist and collector characters exist with a relationship score that decays exponentially each round without contact
-- [ ] **DEPTH-02**: Relationship score affects a named character's bid likelihood in auctions (±10–15% modifier)
-- [ ] **DEPTH-03**: A "cold" relationship state is visually indicated before the score hits zero (warning before loss)
+- [x] **DEPTH-01**: Named artist and collector characters exist with a relationship score that decays exponentially each round without contact
+- [x] **DEPTH-02**: Relationship score affects a named character's bid likelihood in auctions (±10–15% modifier)
+- [x] **DEPTH-03**: A "cold" relationship state is visually indicated before the score hits zero (warning before loss)
 - [ ] **DEPTH-04**: The landlord communicates via text messages in wall-label font, progressing through 5 escalation stages
 - [ ] **DEPTH-05**: Landlord stage progression is gated by gallery Prestige (show history, press coverage, collector visit count)
 - [ ] **DEPTH-06**: Drug inventory is tracked per player and renders on the same appraisal form as the painting collection
 - [ ] **DEPTH-07**: Drug use at parties and art fairs applies a Coolness modifier and Restedness cost
 - [ ] **DEPTH-08**: Carrying drugs above inventory threshold accumulates a passive Risk stat
-- [ ] **DEPTH-09**: Faction alignment is tracked in player sim state and applies basic stat modifiers (stubs, not full narrative depth)
-- [ ] **DEPTH-10**: The "Artist You Shouldn't Have Dropped" generates a passive Credibility penalty scaled to that artist's current market value, visible to the player
+- [x] **DEPTH-09**: Faction alignment is tracked in player sim state and applies basic stat modifiers (stubs, not full narrative depth)
+- [x] **DEPTH-10**: The "Artist You Shouldn't Have Dropped" generates a passive Credibility penalty scaled to that artist's current market value, visible to the player
 
 ### NFT Layer
 
@@ -153,16 +153,16 @@
 | SIM-08 | Phase 3 — Core Sim Loop | Complete |
 | SIM-09 | Phase 3 — Core Sim Loop | Complete |
 | SIM-10 | Phase 3 — Core Sim Loop | Complete |
-| DEPTH-01 | Phase 4 — Sim Depth | Pending |
-| DEPTH-02 | Phase 4 — Sim Depth | Pending |
-| DEPTH-03 | Phase 4 — Sim Depth | Pending |
+| DEPTH-01 | Phase 4 — Sim Depth | Complete |
+| DEPTH-02 | Phase 4 — Sim Depth | Complete |
+| DEPTH-03 | Phase 4 — Sim Depth | Complete |
 | DEPTH-04 | Phase 4 — Sim Depth | Pending |
 | DEPTH-05 | Phase 4 — Sim Depth | Pending |
 | DEPTH-06 | Phase 4 — Sim Depth | Pending |
 | DEPTH-07 | Phase 4 — Sim Depth | Pending |
 | DEPTH-08 | Phase 4 — Sim Depth | Pending |
-| DEPTH-09 | Phase 4 — Sim Depth | Pending |
-| DEPTH-10 | Phase 4 — Sim Depth | Pending |
+| DEPTH-09 | Phase 4 — Sim Depth | Complete |
+| DEPTH-10 | Phase 4 — Sim Depth | Complete |
 | NFT-01 | Phase 5 — NFT Layer & End State | Pending |
 | NFT-02 | Phase 5 — NFT Layer & End State | Pending |
 | NFT-03 | Phase 5 — NFT Layer & End State | Pending |
