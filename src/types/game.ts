@@ -39,6 +39,7 @@ export interface AuctionState {
   sealedBids: Record<number, number>   // playerIdx -> bid
   onceAroundBids: Record<number, number | null>  // playerIdx -> bid or null=pass
   onceAroundCurrentIdx: number
+  waitingSecondCardIdx: number   // whose turn it is to play/pass the 2nd card during 'waiting_second'
   winnerIdx: number | null
   finalPrice: number | null
 }
@@ -62,6 +63,18 @@ export interface GameState {
   deck: Card[]                         // server keeps deck here
   auction: AuctionState | null
   players: PublicPlayer[]
+}
+
+// Public projection types — what clients are allowed to see.
+// Sealed bid AMOUNTS are stripped (presence-only) until the auction completes,
+// and the deck is never broadcast.
+export type PublicAuctionState = Omit<AuctionState, 'sealedBids'> & {
+  sealedBids: Record<number, true>
+}
+
+export type PublicGameState = Omit<GameState, 'deck' | 'auction'> & {
+  deck: never[]
+  auction: PublicAuctionState | null
 }
 
 export interface PlayerRecord {

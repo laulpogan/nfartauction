@@ -1,9 +1,12 @@
 import type * as Party from 'partykit/server'
-import type { GameState, Card, Artist } from '../src/types/game'
+import type {
+  GameState, Card, Artist, RoundResult,
+  PublicGameState, PublicAuctionState,
+} from '../src/types/game'
 import { ARTISTS } from '../src/types/game'
 import {
-  makePublicPlayer, emptyArtistCounts,
-  playCard, playSecondCard, setFixedPrice, acceptFixedPrice,
+  emptyArtistCounts,
+  playCard, playSecondCard, passSecondCard, setFixedPrice, acceptFixedPrice,
   passFixedPrice, placeOpenBid, endOpenAuction, placeOnceAroundBid,
   submitSealedBid, endRound,
 } from '../src/lib/engine'
@@ -25,6 +28,7 @@ interface ServerState {
   game: GameState
   hands: Record<string, Card[]>       // sessionId → hand
   sessions: Record<string, Session>   // sessionId → session info
+  lastRoundResult?: RoundResult       // persisted for reconnect recovery (ENG-09)
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

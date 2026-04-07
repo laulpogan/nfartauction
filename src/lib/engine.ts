@@ -106,6 +106,11 @@ export function playCard(
     sealedBids: {},
     onceAroundBids: {},
     onceAroundCurrentIdx: (game.currentPlayerIdx + 1) % game.players.length,
+    // For 'double' auctions: the player clockwise from the auctioneer plays/passes first.
+    // For non-double auctions this field is unused but must be set; default to auctioneer.
+    waitingSecondCardIdx: card.auctionType === 'double'
+      ? (game.currentPlayerIdx + 1) % game.players.length
+      : game.currentPlayerIdx,
     winnerIdx: null,
     finalPrice: null,
   }
@@ -141,12 +146,17 @@ export function playSecondCard(
   let status: AuctionState['status'] = 'active'
   if (resolvedType === 'fixed_price') status = 'set_price'
 
+  // Per official Knizia Modern Art rules: whoever plays the 2nd card becomes
+  // the new auctioneer for this lot and collects the proceeds.
+  const newAuctioneerIdx = player.position
   const auction: AuctionState = {
     ...game.auction,
     cards: [...game.auction.cards, card],
     auctionType: resolvedType,
     status,
-    onceAroundCurrentIdx: (game.auction.auctioneerIdx + 1) % game.players.length,
+    auctioneerIdx: newAuctioneerIdx,
+    waitingSecondCardIdx: newAuctioneerIdx,
+    onceAroundCurrentIdx: (newAuctioneerIdx + 1) % game.players.length,
   }
 
   // Count the second artist painting too
@@ -155,6 +165,49 @@ export function playSecondCard(
 
   const updatedGame: GameState = { ...game, artistCounts, auction }
   return { updatedGame, updatedPlayer }
+}
+
+// ─── Pass Second Card (for Double auction) ────────────────────────────────────
+//
+// Per faithful Knizia rules: any player clockwise from the auctioneer may
+// decline to pair the double card. If every player passes back to the original
+// auctioneer, the auctioneer takes the single card for free (no auction held).
+//
+// During 'waiting_second' status, `auction.auctioneerIdx` is still the ORIGINAL
+// auctioneer (it only gets reassigned in playSecondCard). So when
+// waitingSecondCardIdx wraps back to auctioneerIdx, every other player has
+// already passed.
+export function passSecondCard(
+  game: GameState,
+  _passerIdx: number,
+): { updatedGame: GameState; auctioneerTakesFree: boolean } {
+  if (!game.auction || game.auction.status !== 'waiting_second') {
+    throw new Error('No second-card phase active')
+  }
+  const { auction } = game
+  const nextIdx = (auction.waitingSecondCardIdx + 1) % game.players.length
+
+  if (nextIdx === auction.auctioneerIdx) {
+    // Full clockwise wrap — every other player passed.
+    // Original auctioneer takes the single card for free; no auction is held.
+    // The painting was already counted in artistCounts during playCard.
+    return {
+      updatedGame: {
+        ...game,
+        auction: null,
+        currentPlayerIdx: (game.currentPlayerIdx + 1) % game.players.length,
+      },
+      auctioneerTakesFree: true,
+    }
+  }
+
+  return {
+    updatedGame: {
+      ...game,
+      auction: { ...auction, waitingSecondCardIdx: nextIdx },
+    },
+    auctioneerTakesFree: false,
+  }
 }
 
 // ─── Set Fixed Price ─────────────────────────────────────────────────────────
