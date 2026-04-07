@@ -1,338 +1,42 @@
-import { useState } from 'react'
-import { clsx } from 'clsx'
-import { motion, AnimatePresence } from 'framer-motion'
-import type { GameState } from '../../types/game'
-import { ARTIST_NAMES, AUCTION_TYPE_NAMES } from '../../types/game'
-import { ArtCard } from './ArtCard'
-import { Button } from '../ui/Button'
+import { AnimatePresence } from 'framer-motion'
+import type { AuctionSkinProps } from './auction-skins/types'
+import { OpenAuctionSkin } from './auction-skins/OpenAuctionSkin'
+import { OnceAroundSkin } from './auction-skins/OnceAroundSkin'
+import { SealedBidSkin } from './auction-skins/SealedBidSkin'
+import { FixedPriceSkin } from './auction-skins/FixedPriceSkin'
+import { DoubleSkin } from './auction-skins/DoubleSkin'
 
-interface AuctionPanelProps {
-  game: GameState
-  myPlayerIdx: number
-  isAuctioneer: boolean
-  onSetFixedPrice: (price: number) => void
-  onAcceptFixedPrice: () => void
-  onPassFixedPrice: () => void
-  onPlaceOpenBid: (amount: number) => void
-  onEndOpenAuction: () => void
-  onPlaceOnceAroundBid: (amount: number | null) => void
-  onSubmitSealedBid: (amount: number) => void
-  myMoney: number
-}
+export type AuctionPanelProps = AuctionSkinProps
 
-function formatMoney(n: number) {
-  return `$${n.toLocaleString()}`
-}
+/**
+ * Slim dispatcher. The visual logic for each auction type lives in its own
+ * skin sub-component under ./auction-skins. AuctionPanel only decides which
+ * skin to mount, wrapped in AnimatePresence mode="wait" keyed on
+ * auction.id so skin swaps between distinct auctions never visually
+ * overlap.
+ */
+export function AuctionPanel(props: AuctionPanelProps) {
+  const { game } = props
+  if (!game.auction) return null
 
-export function AuctionPanel({
-  game, myPlayerIdx, isAuctioneer,
-  onSetFixedPrice, onAcceptFixedPrice, onPassFixedPrice,
-  onPlaceOpenBid, onEndOpenAuction,
-  onPlaceOnceAroundBid, onSubmitSealedBid,
-  myMoney,
-}: AuctionPanelProps) {
-  const { auction } = game
-  const [bidAmount, setBidAmount] = useState('')
-  const [fixedPriceInput, setFixedPriceInput] = useState('')
-  const [sealedBidInput, setSealedBidInput] = useState('')
-  const [sealedBidSubmitted, setSealedBidSubmitted] = useState(false)
-
-  if (!auction) return null
-
-  const auctioneer = game.players[auction.auctioneerIdx]
-  const hasSubmittedSealed = auction.sealedBids[myPlayerIdx] !== undefined
-
-  const isOnceAroundMyTurn =
-    auction.onceAroundCurrentIdx === myPlayerIdx &&
-    auction.auctionType === 'once_around'
-
-  const fixedPriceMyTurn =
-    auction.auctionType === 'fixed_price' &&
-    auction.status === 'active' &&
-    auction.onceAroundCurrentIdx === myPlayerIdx
+  const skin = (() => {
+    switch (game.auction.auctionType) {
+      case 'open':
+        return <OpenAuctionSkin {...props} />
+      case 'once_around':
+        return <OnceAroundSkin {...props} />
+      case 'sealed_bid':
+        return <SealedBidSkin {...props} />
+      case 'fixed_price':
+        return <FixedPriceSkin {...props} />
+      case 'double':
+        return <DoubleSkin {...props} />
+    }
+  })()
 
   return (
-    <AnimatePresence>
-      <motion.div
-        key={auction.id}
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="rounded-2xl border-2 border-[var(--color-accent)] p-4 bg-paper"
-      >
-        {/* Auction header */}
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <div>
-                <div className="text-ink font-bold uppercase tracking-[0.18em]">{AUCTION_TYPE_NAMES[auction.auctionType]} Auction</div>
-                <div className="text-xs text-ink-soft uppercase tracking-[0.18em]">
-                  Auctioneer: <span className="text-ink font-semibold">{auctioneer?.displayName}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          {auction.status === 'waiting_second' && (
-            <span className="bg-paper border border-[var(--color-accent)] text-[var(--color-accent)] text-xs px-2 py-1 rounded-full uppercase tracking-[0.18em]">
-              Waiting for 2nd card
-            </span>
-          )}
-        </div>
-
-        {/* Cards being auctioned */}
-        <div className="flex gap-2 mb-4">
-          {auction.cards.map(card => (
-            <ArtCard key={card.id} card={card} size="md" />
-          ))}
-        </div>
-
-        {/* Status: waiting for second card (double auction) */}
-        {auction.status === 'waiting_second' && (
-          <div className="bg-paper border border-rule rounded-xl p-3">
-            <p className="text-ink text-sm">
-              Double auction. Play a second <strong>{ARTIST_NAMES[auction.cards[0].artist]}</strong> card from your hand to complete this lot.
-            </p>
-          </div>
-        )}
-
-        {/* Set fixed price */}
-        {auction.status === 'set_price' && isAuctioneer && (
-          <div className="space-y-2">
-            <p className="text-ink text-sm uppercase tracking-[0.18em]">Set your asking price:</p>
-            <div className="flex gap-2">
-              <input
-                type="number"
-                value={fixedPriceInput}
-                onChange={e => setFixedPriceInput(e.target.value)}
-                placeholder="e.g. 15000"
-                className="flex-1 bg-paper border border-ink rounded-lg px-3 py-2 text-ink text-sm focus:outline-none focus:border-[var(--color-accent)]"
-                min={0}
-              />
-              <Button
-                variant="gold"
-                onClick={() => {
-                  const p = parseInt(fixedPriceInput)
-                  if (!isNaN(p) && p >= 0) { onSetFixedPrice(p); setFixedPriceInput('') }
-                }}
-                disabled={!fixedPriceInput}
-              >
-                Set Price
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Fixed price — offer to players */}
-        {auction.auctionType === 'fixed_price' && auction.status === 'active' && auction.fixedPrice !== null && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="text-ink-soft text-sm uppercase tracking-[0.18em]">Asking price:</span>
-              <span className="text-ink font-bold text-lg">{formatMoney(auction.fixedPrice)}</span>
-            </div>
-            <div className="text-xs text-ink-soft uppercase tracking-[0.18em]">
-              {game.players[auction.onceAroundCurrentIdx]?.displayName}'s turn
-            </div>
-            {fixedPriceMyTurn && (
-              <div className="flex gap-2">
-                <Button
-                  variant="gold"
-                  onClick={onAcceptFixedPrice}
-                  disabled={myMoney < (auction.fixedPrice ?? 0)}
-                >
-                  Buy for {formatMoney(auction.fixedPrice)}
-                </Button>
-                <Button variant="secondary" onClick={onPassFixedPrice}>Pass</Button>
-              </div>
-            )}
-            {fixedPriceMyTurn && myMoney < (auction.fixedPrice ?? 0) && (
-              <p className="text-[var(--color-stamp)] text-xs uppercase tracking-[0.18em]">Not enough money</p>
-            )}
-          </div>
-        )}
-
-        {/* Open auction */}
-        {auction.auctionType === 'open' && auction.status === 'active' && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-ink-soft text-sm uppercase tracking-[0.18em]">Current bid: </span>
-                <span className="text-ink font-bold text-xl">
-                  {auction.currentBid > 0 ? formatMoney(auction.currentBid) : 'No bids yet'}
-                </span>
-              </div>
-              {auction.leadingBidderIdx !== null && (
-                <span className="text-sm text-ink-soft uppercase tracking-[0.18em]">
-                  Leading: <span className="text-ink font-semibold">{game.players[auction.leadingBidderIdx]?.displayName}</span>
-                </span>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              <input
-                type="number"
-                value={bidAmount}
-                onChange={e => setBidAmount(e.target.value)}
-                placeholder={`Min ${auction.currentBid + 1}`}
-                className="flex-1 bg-paper border border-ink rounded-lg px-3 py-2 text-ink text-sm focus:outline-none focus:border-[var(--color-accent)]"
-                min={auction.currentBid + 1}
-              />
-              <Button
-                variant="primary"
-                onClick={() => {
-                  const amt = parseInt(bidAmount)
-                  if (!isNaN(amt) && amt > auction.currentBid) { onPlaceOpenBid(amt); setBidAmount('') }
-                }}
-                disabled={!bidAmount || parseInt(bidAmount) <= auction.currentBid || parseInt(bidAmount) > myMoney}
-              >
-                Bid
-              </Button>
-            </div>
-
-            {isAuctioneer && (
-              <Button
-                variant="gold"
-                className="w-full"
-                onClick={onEndOpenAuction}
-              >
-                HAMMER DOWN — SOLD
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* Once around */}
-        {auction.auctionType === 'once_around' && auction.status === 'active' && (
-          <div className="space-y-3">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-ink-soft text-sm uppercase tracking-[0.18em]">Highest bid:</span>
-                <span className="text-ink font-bold">
-                  {Object.values(auction.onceAroundBids).filter(b => b !== null).length > 0
-                    ? formatMoney(Math.max(...(Object.values(auction.onceAroundBids).filter(b => b !== null) as number[])))
-                    : 'No bids yet'}
-                </span>
-              </div>
-              {/* Bid status per player */}
-              <div className="flex gap-1.5">
-                {game.players.map((p, i) => {
-                  const bid = auction.onceAroundBids[i]
-                  const isCurrent = auction.onceAroundCurrentIdx === i
-                  return (
-                    <div key={p.id} className={clsx(
-                      'flex-1 rounded-lg py-1 px-1 text-center text-xs',
-                      isCurrent ? 'border border-[var(--color-accent)] bg-paper' : 'bg-paper border border-rule',
-                    )}>
-                      <div className={clsx('font-semibold truncate uppercase tracking-[0.18em]', i === myPlayerIdx ? 'text-[var(--color-accent)]' : 'text-ink')}>
-                        {p.displayName.split(' ')[0]}
-                      </div>
-                      <div className="text-ink-soft">
-                        {bid === undefined
-                          ? isCurrent ? '...' : '—'
-                          : bid === null ? 'Pass'
-                          : formatMoney(bid)}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {isOnceAroundMyTurn && (
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={bidAmount}
-                  onChange={e => setBidAmount(e.target.value)}
-                  placeholder="Your bid"
-                  className="flex-1 bg-paper border border-ink rounded-lg px-3 py-2 text-ink text-sm focus:outline-none focus:border-[var(--color-accent)]"
-                  min={1}
-                />
-                <Button
-                  variant="primary"
-                  onClick={() => {
-                    const amt = parseInt(bidAmount)
-                    if (!isNaN(amt) && amt > 0) { onPlaceOnceAroundBid(amt); setBidAmount('') }
-                  }}
-                  disabled={!bidAmount || parseInt(bidAmount) > myMoney}
-                >
-                  Bid
-                </Button>
-                <Button variant="secondary" onClick={() => onPlaceOnceAroundBid(null)}>Pass</Button>
-              </div>
-            )}
-            {!isOnceAroundMyTurn && auction.onceAroundBids[myPlayerIdx] === undefined && (
-              <p className="text-ink-soft text-sm uppercase tracking-[0.18em]">Waiting for {game.players[auction.onceAroundCurrentIdx]?.displayName}...</p>
-            )}
-          </div>
-        )}
-
-        {/* Sealed bid */}
-        {auction.auctionType === 'sealed_bid' && auction.status === 'active' && (
-          <div className="space-y-3">
-            <p className="text-ink text-sm uppercase tracking-[0.18em]">
-              Submit your sealed bid — highest wins. {Object.keys(auction.sealedBids).length}/{game.players.length} submitted.
-            </p>
-            {/* Show who has / hasn't submitted (not amounts) */}
-            <div className="flex gap-1.5">
-              {game.players.map((p, i) => {
-                const submitted = auction.sealedBids[i] !== undefined
-                return (
-                  <div key={p.id} className={clsx(
-                    'flex-1 rounded-lg py-1 px-1 text-center text-xs',
-                    submitted ? 'bg-paper border border-ink' : 'bg-paper border border-rule',
-                  )}>
-                    <div className={clsx('font-semibold truncate uppercase tracking-[0.18em]', i === myPlayerIdx ? 'text-[var(--color-accent)]' : 'text-ink')}>
-                      {p.displayName.split(' ')[0]}
-                    </div>
-                    <div className={submitted ? 'text-ink' : 'text-ink-soft'}>
-                      {submitted ? 'IN' : '...'}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {!hasSubmittedSealed && !sealedBidSubmitted && (
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={sealedBidInput}
-                  onChange={e => setSealedBidInput(e.target.value)}
-                  placeholder="Your secret bid"
-                  className="flex-1 bg-paper border border-ink rounded-lg px-3 py-2 text-ink text-sm focus:outline-none focus:border-[var(--color-accent)]"
-                  min={0}
-                />
-                <Button
-                  variant="primary"
-                  onClick={() => {
-                    const amt = parseInt(sealedBidInput)
-                    if (!isNaN(amt) && amt >= 0) {
-                      onSubmitSealedBid(amt)
-                      setSealedBidSubmitted(true)
-                      setSealedBidInput('')
-                    }
-                  }}
-                  disabled={!sealedBidInput}
-                >
-                  Lock In
-                </Button>
-              </div>
-            )}
-            {(hasSubmittedSealed || sealedBidSubmitted) && (
-              <p className="text-ink text-sm uppercase tracking-[0.18em]">Bid submitted — waiting for others...</p>
-            )}
-          </div>
-        )}
-
-        {/* Completed */}
-        {auction.status === 'completed' && (
-          <div className="bg-paper border border-rule rounded-xl p-3">
-            <p className="text-ink text-sm font-semibold uppercase tracking-[0.18em]">
-              Sold to {game.players[auction.winnerIdx ?? 0]?.displayName} for {formatMoney(auction.finalPrice ?? 0)}
-            </p>
-          </div>
-        )}
-      </motion.div>
+    <AnimatePresence mode="wait">
+      <div key={game.auction.id}>{skin}</div>
     </AnimatePresence>
   )
 }
