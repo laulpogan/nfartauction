@@ -52,9 +52,9 @@
 - [x] **DEPTH-03**: A "cold" relationship state is visually indicated before the score hits zero (warning before loss)
 - [x] **DEPTH-04**: The landlord communicates via text messages in wall-label font, progressing through 5 escalation stages
 - [x] **DEPTH-05**: Landlord stage progression is gated by gallery Prestige (show history, press coverage, collector visit count)
-- [ ] **DEPTH-06**: Drug inventory is tracked per player and renders on the same appraisal form as the painting collection
-- [ ] **DEPTH-07**: Drug use at parties and art fairs applies a Coolness modifier and Restedness cost
-- [ ] **DEPTH-08**: Carrying drugs above inventory threshold accumulates a passive Risk stat
+- [x] **DEPTH-06**: Drug inventory is tracked per player and renders on the same appraisal form as the painting collection
+- [x] **DEPTH-07**: Drug use at parties and art fairs applies a Coolness modifier and Restedness cost
+- [x] **DEPTH-08**: Carrying drugs above inventory threshold accumulates a passive Risk stat
 - [x] **DEPTH-09**: Faction alignment is tracked in player sim state and applies basic stat modifiers (stubs, not full narrative depth)
 - [x] **DEPTH-10**: The "Artist You Shouldn't Have Dropped" generates a passive Credibility penalty scaled to that artist's current market value, visible to the player
 
@@ -158,9 +158,9 @@
 | DEPTH-03 | Phase 4 — Sim Depth | Complete |
 | DEPTH-04 | Phase 4 — Sim Depth | Complete |
 | DEPTH-05 | Phase 4 — Sim Depth | Complete |
-| DEPTH-06 | Phase 4 — Sim Depth | Pending |
-| DEPTH-07 | Phase 4 — Sim Depth | Pending |
-| DEPTH-08 | Phase 4 — Sim Depth | Pending |
+| DEPTH-06 | Phase 4 — Sim Depth | Complete |
+| DEPTH-07 | Phase 4 — Sim Depth | Complete |
+| DEPTH-08 | Phase 4 — Sim Depth | Complete |
 | DEPTH-09 | Phase 4 — Sim Depth | Complete |
 | DEPTH-10 | Phase 4 — Sim Depth | Complete |
 | NFT-01 | Phase 5 — NFT Layer & End State | Pending |

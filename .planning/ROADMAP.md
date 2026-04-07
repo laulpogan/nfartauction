@@ -90,7 +90,7 @@ Plans:
 Plans:
 - [x] 04-01-PLAN.md — Relationship system: Relationship[] in PlayerSimState, exponential decay, cold-state chip, bid-likelihood modifier, dropped-artist seed, faction derivation, RelationshipPanel UI (DEPTH-01, 02, 03, 09, 10)
 - [x] 04-02-PLAN.md — Landlord arc: 5-stage prestige-gated progression, authored stage messages, LandlordMessages iMessage-style UI in SimPanel (DEPTH-04, 05)
-- [ ] 04-03-PLAN.md — Drug system: DrugItem[] inventory, server-rolled acquisition at flatlands/hotel, party-slot use, accumulateRisk, DrugInventory UI as AppraisalForm, RISK row on StatDisplay (DEPTH-06, 07, 08)
+- [x] 04-03-PLAN.md — Drug system: DrugItem[] inventory, server-rolled acquisition at flatlands/hotel, party-slot use, accumulateRisk, DrugInventory UI as AppraisalForm, RISK row on StatDisplay (DEPTH-06, 07, 08)
 **UI hint**: yes
 
 ### Phase 5: NFT Layer & End State
