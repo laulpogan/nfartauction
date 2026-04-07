@@ -224,8 +224,11 @@ function derivePublicState(game: GameState): PublicGameState {
 
 export default class GameServer implements Party.Server {
   private state: ServerState | null = null
+  readonly room: Party.Room
 
-  constructor(readonly room: Party.Room) {}
+  constructor(room: Party.Room) {
+    this.room = room
+  }
 
   async onStart() {
     this.state = await this.room.storage.get<ServerState>('state') ?? null

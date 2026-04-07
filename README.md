@@ -1,73 +1,82 @@
-# React + TypeScript + Vite
+# NFArt Auction
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A snarky multiplayer browser implementation of Reiner Knizia's *Modern Art* (1992),
+wrapped by a daily gallery sim. 2–4 players, no install, all in the browser.
 
-Currently, two official plugins are available:
+Tech: TypeScript + React 19 + Vite + Tailwind v4 + PartyKit (authoritative server on
+Cloudflare Workers / Durable Objects).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Local development
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev          # Vite dev server (frontend)
+npx partykit dev     # PartyKit server (multiplayer backend)
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The frontend reads `VITE_PARTYKIT_HOST` from `.env.local`. For local dev leave it
+unset and the client will connect to `127.0.0.1:1999` (PartyKit's default).
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Tests
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm test             # vitest run
+npx tsc --noEmit     # type check
+```
+
+## Deployment
+
+The game is deployed as two pieces: a PartyKit backend (WebSocket server + Durable
+Objects) and a static frontend on Cloudflare Pages.
+
+### 1. Server — PartyKit
+
+```bash
+npx partykit deploy
+```
+
+This deploys `party/server.ts` to `nfart-auction.laulpogan.partykit.dev` (the project
+name is set in `partykit.json`). Run once whenever the server code changes.
+
+### 2. Frontend — Cloudflare Pages
+
+```bash
+npm run build
+```
+
+This produces a static bundle in `dist/`. Two ways to ship it:
+
+**Option A — Manual upload**
+Drag the `dist/` directory into the Cloudflare Pages dashboard ("Direct Upload"
+project).
+
+**Option B — Git integration**
+Connect the repo to a Cloudflare Pages project with:
+- **Build command:** `npm run build`
+- **Build output directory:** `dist`
+
+SPA routing is handled by `public/_redirects` (`/* /index.html 200`), which Vite
+copies into `dist/` automatically.
+
+### Required environment variables
+
+Set on the Cloudflare Pages project (Settings → Environment variables):
+
+| Name                 | Value                                       |
+| -------------------- | ------------------------------------------- |
+| `VITE_PARTYKIT_HOST` | `nfart-auction.laulpogan.partykit.dev`      |
+
+No Supabase or database credentials are required — PartyKit Durable Objects hold all
+game state.
+
+## Project structure
+
+```
+party/server.ts        PartyKit Durable Object (authoritative game server)
+src/lib/engine.ts      Pure auction engine (state-in / state-out, fully tested)
+src/lib/deck.ts        Card deck and dealing
+src/components/game/   React game UI
+src/hooks/useGame.ts   WebSocket client wrapper around partysocket
+public/_redirects      Cloudflare Pages SPA fallback
+partykit.json          PartyKit project config
 ```

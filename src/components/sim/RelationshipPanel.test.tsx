@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render } from '@testing-library/react'
 import { RelationshipPanel } from './RelationshipPanel'
 import { createInitialPlayerSimState } from '../../lib/sim-config'
 import { seedDroppedArtist } from '../../lib/sim-engine'

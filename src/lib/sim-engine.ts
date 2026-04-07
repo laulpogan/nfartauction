@@ -36,13 +36,11 @@ import type {
 } from '../types/game'
 import {
   SLOT_DEFINITIONS,
-  SIM_CONFIG,
   RELATIONSHIP_CONFIG,
   LANDLORD_CONFIG,
   DRUG_CONFIG,
   DRUG_DEFINITIONS,
   NFT_CONFIG,
-  NFT_ITEM_DEFINITIONS,
   APPRAISAL_TEMPLATES,
 } from './sim-config'
 
