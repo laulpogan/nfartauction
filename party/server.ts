@@ -9,9 +9,8 @@ import {
   emptyArtistCounts,
   playCard, playSecondCard, passSecondCard, setFixedPrice, acceptFixedPrice,
   passFixedPrice, placeOpenBid, endOpenAuction, placeOnceAroundBid,
-  submitSealedBid, endRound,
+  submitSealedBid, endRound, startGame,
 } from '../src/lib/engine'
-import { buildDeck, shuffle, dealHands } from '../src/lib/deck'
 import type { PlayerRecord } from '../src/types/game'
 
 // ─── Inbound message schema (ENG-05) ──────────────────────────────────────────
@@ -236,39 +235,20 @@ export default class GameServer implements Party.Server {
       if (!session?.isHost) { sender.send(JSON.stringify({ type: 'ERROR', message: 'Only host can start' })); return }
       if (this.state.game.players.length < 2) { sender.send(JSON.stringify({ type: 'ERROR', message: 'Need at least 2 players' })); return }
 
-      const playerCount = this.state.game.players.length
-      const deck = shuffle(buildDeck())
-      const { hands, remaining } = dealHands(deck, playerCount, 1)
+      // ENG-06: delegate to engine.startGame — no duplicated deal logic here.
+      const allRecords = this.getAllPlayerRecords()
+      const { updatedGame, updatedPlayers } = startGame(this.state.game, allRecords)
 
-      const sortedSessions = Object.values(this.state.sessions).sort((a, b) => a.position - b.position)
-      const newSessions: Record<string, Session> = {}
+      // Sync engine-returned hands/money/paintings back into server state.
       const newHands: Record<string, Card[]> = {}
-
-      sortedSessions.forEach((sess, i) => {
-        newSessions[sess.sessionId] = { ...sess, money: 100000, paintings: [] }
-        newHands[sess.sessionId] = hands[i] ?? []
-      })
-
-      const updatedPlayers = sortedSessions.map(s => sessionToPublicPlayer({ ...s, money: 100000, paintings: [] }))
-
-      this.state = {
-        ...this.state,
-        game: {
-          ...this.state.game,
-          status: 'playing',
-          round: 1,
-          currentPlayerIdx: 0,
-          artistCounts: emptyArtistCounts(),
-          roundValues: emptyArtistCounts(),
-          roundHistory: [],
-          deck: remaining,
-          auction: null,
-          players: updatedPlayers,
-        },
-        hands: newHands,
-        sessions: newSessions,
+      const newSessions = { ...this.state.sessions }
+      for (const p of updatedPlayers) {
+        newHands[p.sessionId] = p.hand
+        const sess = newSessions[p.sessionId]
+        if (sess) newSessions[p.sessionId] = { ...sess, money: p.money, paintings: p.paintings }
       }
 
+      this.state = { ...this.state, game: updatedGame, hands: newHands, sessions: newSessions }
       await this.persist()
       this.broadcastStateSecure()
       this.broadcastHands()
