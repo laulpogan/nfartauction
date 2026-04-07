@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-04-07T04:56:33.530Z"
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-04-07T05:21:33.799Z"
 last_activity: 2026-04-07
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_plans: 10
+  completed_plans: 7
+  percent: 70
 ---
 
 # Project State
@@ -58,6 +58,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02 P01 | 8min | 2 tasks | 23 files |
 | Phase 02 P02 | 5m | 2 tasks | 9 files |
 | Phase 02 P03 | 6min | 2 tasks | 10 files |
+| Phase 03 P01 | 3min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,8 @@ Recent decisions affecting current work:
 - [Phase 02]: Atomic palette swap extended to shared UI (Button/Modal/lobby/ArtCard/PlayerList/ArtistTracker) to honor no-half-state directive
 - [Phase 02]: Framer-motion mocked at test boundary (motion.div passthrough) for Receipt tests to avoid jsdom animation issues
 - [Phase 02]: AppraisalForm ships with no live Phase 2 consumer by design; first consumer is Phase 3 sim stats
+- [Phase 03]: Drift sourced as parameter to advanceDay/applyGlobalStatDrift — server owns entropy, sim-engine stays absolutely pure
+- [Phase 03]: Travel modeled as inline cost on activity slots inside resolveSlots; capacity bookkeeping deferred to server scheduler
 
 ### Pending Todos
 
@@ -86,6 +89,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-07T04:56:33.527Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-04-07T05:21:33.796Z
+Stopped at: Completed 03-01-PLAN.md
 Resume file: None
