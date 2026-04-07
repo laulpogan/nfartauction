@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { v4 as uuid } from 'uuid'
 import PartySocket from 'partysocket'
-import type { GameState, Card, RoundResult } from '../types/game'
+import type { GameState, Card, RoundResult, PlayerSimState, TimeSlot } from '../types/game'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -22,6 +22,7 @@ export function getSessionId(): string {
 export function useGame(roomCode: string | null, playerName: string | null) {
   const [game, setGame] = useState<GameState | null>(null)
   const [hand, setHand] = useState<Card[]>([])
+  const [playerSim, setPlayerSim] = useState<PlayerSimState | null>(null)
   const [roundEndResult, setRoundEndResult] = useState<RoundResult | null>(null)
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -48,6 +49,7 @@ export function useGame(roomCode: string | null, playerName: string | null) {
       const msg = JSON.parse(e.data)
       if (msg.type === 'GAME_STATE') setGame(msg.game as GameState)
       if (msg.type === 'YOUR_HAND') setHand(msg.hand as Card[])
+      if (msg.type === 'YOUR_SIM_STATE') setPlayerSim(msg.simState as PlayerSimState)
       if (msg.type === 'ROUND_END') setRoundEndResult(msg.result as RoundResult)
       if (msg.type === 'ERROR') setError(msg.message as string)
     })
@@ -74,6 +76,7 @@ export function useGame(roomCode: string | null, playerName: string | null) {
   return {
     game,
     hand,
+    playerSim,
     myPlayerIdx,
     isMyTurn,
     isAuctioneer,
@@ -94,6 +97,7 @@ export function useGame(roomCode: string | null, playerName: string | null) {
       endOpenAuction:     () => send({ type: 'END_OPEN_AUCTION' }),
       placeOnceAroundBid: (amount: number | null) => send({ type: 'PLACE_ONCE_AROUND_BID', amount }),
       submitSealedBid:    (amount: number) => send({ type: 'SUBMIT_SEALED_BID', amount }),
+      submitSlots:        (slots: TimeSlot[]) => send({ type: 'SUBMIT_SLOTS', slots }),
     },
   }
 }
