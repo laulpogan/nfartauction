@@ -85,13 +85,12 @@ Plans:
   3. The landlord sends a text message at each of the five escalation stages, gated by gallery Prestige — all five stages are reachable in a full game
   4. Drug inventory appears on the same appraisal form as the painting collection, in the same wall-label format
   5. Carrying drugs above the inventory threshold shows a passive Risk stat accumulating on the player's appraisal form
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 04-01: Relationship system — Relationship[] in PlayerSimState, exponential decay, cold-state indicator
-- [ ] 04-02: Bid likelihood modifier — applySimModifiers injects relationship score into auction inputs
-- [ ] 04-03: Landlord arc — five authored text stages, Prestige-gated progression, wall-label text format
-- [ ] 04-04: Drug system — DrugItem[] tracking, party/fair modifier, passive Risk stat, appraisal form render; faction stubs
+- [ ] 04-01-PLAN.md — Relationship system: Relationship[] in PlayerSimState, exponential decay, cold-state chip, bid-likelihood modifier, dropped-artist seed, faction derivation, RelationshipPanel UI (DEPTH-01, 02, 03, 09, 10)
+- [ ] 04-02-PLAN.md — Landlord arc: 5-stage prestige-gated progression, authored stage messages, LandlordMessages iMessage-style UI in SimPanel (DEPTH-04, 05)
+- [ ] 04-03-PLAN.md — Drug system: DrugItem[] inventory, server-rolled acquisition at flatlands/hotel, party-slot use, accumulateRisk, DrugInventory UI as AppraisalForm, RISK row on StatDisplay (DEPTH-06, 07, 08)
 **UI hint**: yes
 
 ### Phase 5: NFT Layer & End State
