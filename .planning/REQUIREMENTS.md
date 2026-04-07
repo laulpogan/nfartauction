@@ -25,12 +25,12 @@
 - [x] **AEST-03**: Wall-label typography component renders all game copy — auction results, stat displays, drug inventory — in the same format as gallery labels
 - [x] **AEST-04**: Auction results render as a printed receipt (not a generic result card)
 - [x] **AEST-05**: Player stats display as an appraisal form (not a HUD or dashboard)
-- [ ] **AEST-06**: Open auction visual skin: preview night aesthetic with character indicators and raised-hand feedback
-- [ ] **AEST-07**: Once Around auction visual skin: formal dinner aesthetic, players shown in seat order, bids spoken in sequence
-- [ ] **AEST-08**: Sealed bid visual skin: everyone-on-phones aesthetic with a simultaneous reveal animation
-- [ ] **AEST-09**: Fixed price auction visual skin: price tag on white wall with gallery assistant presence indicator
-- [ ] **AEST-10**: Double auction visual skin: drop format, dark background, countdown timer
-- [ ] **AEST-11**: Online neighborhood UI renders with intentionally incorrect font loading and flickering accent color
+- [x] **AEST-06**: Open auction visual skin: preview night aesthetic with character indicators and raised-hand feedback
+- [x] **AEST-07**: Once Around auction visual skin: formal dinner aesthetic, players shown in seat order, bids spoken in sequence
+- [x] **AEST-08**: Sealed bid visual skin: everyone-on-phones aesthetic with a simultaneous reveal animation
+- [x] **AEST-09**: Fixed price auction visual skin: price tag on white wall with gallery assistant presence indicator
+- [x] **AEST-10**: Double auction visual skin: drop format, dark background, countdown timer
+- [x] **AEST-11**: Online neighborhood UI renders with intentionally incorrect font loading and flickering accent color
 
 ### Gallery Sim — Core Loop
 
@@ -137,12 +137,12 @@
 | AEST-03 | Phase 2 — Aesthetic System Foundation | Complete |
 | AEST-04 | Phase 2 — Aesthetic System Foundation | Complete |
 | AEST-05 | Phase 2 — Aesthetic System Foundation | Complete |
-| AEST-06 | Phase 2 — Aesthetic System Foundation | Pending |
-| AEST-07 | Phase 2 — Aesthetic System Foundation | Pending |
-| AEST-08 | Phase 2 — Aesthetic System Foundation | Pending |
-| AEST-09 | Phase 2 — Aesthetic System Foundation | Pending |
-| AEST-10 | Phase 2 — Aesthetic System Foundation | Pending |
-| AEST-11 | Phase 2 — Aesthetic System Foundation | Pending |
+| AEST-06 | Phase 2 — Aesthetic System Foundation | Complete |
+| AEST-07 | Phase 2 — Aesthetic System Foundation | Complete |
+| AEST-08 | Phase 2 — Aesthetic System Foundation | Complete |
+| AEST-09 | Phase 2 — Aesthetic System Foundation | Complete |
+| AEST-10 | Phase 2 — Aesthetic System Foundation | Complete |
+| AEST-11 | Phase 2 — Aesthetic System Foundation | Complete |
 | SIM-01 | Phase 3 — Core Sim Loop | Pending |
 | SIM-02 | Phase 3 — Core Sim Loop | Pending |
 | SIM-03 | Phase 3 — Core Sim Loop | Pending |
