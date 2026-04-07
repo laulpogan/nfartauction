@@ -120,23 +120,66 @@
 
 ## Traceability
 
-*(Populated during roadmap creation)*
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ENG-01 through ENG-10 | — | Pending |
-| AEST-01 through AEST-11 | — | Pending |
-| SIM-01 through SIM-10 | — | Pending |
-| DEPTH-01 through DEPTH-10 | — | Pending |
-| NFT-01 through NFT-05 | — | Pending |
-| END-01 through END-03 | — | Pending |
-| DEPLOY-01 through DEPLOY-03 | — | Pending |
+| ENG-01 | Phase 1 — Engine Hardening & Security | Pending |
+| ENG-02 | Phase 1 — Engine Hardening & Security | Pending |
+| ENG-03 | Phase 1 — Engine Hardening & Security | Pending |
+| ENG-04 | Phase 1 — Engine Hardening & Security | Pending |
+| ENG-05 | Phase 1 — Engine Hardening & Security | Pending |
+| ENG-06 | Phase 1 — Engine Hardening & Security | Pending |
+| ENG-07 | Phase 1 — Engine Hardening & Security | Pending |
+| ENG-08 | Phase 1 — Engine Hardening & Security | Pending |
+| ENG-09 | Phase 1 — Engine Hardening & Security | Pending |
+| ENG-10 | Phase 1 — Engine Hardening & Security | Pending |
+| AEST-01 | Phase 2 — Aesthetic System Foundation | Pending |
+| AEST-02 | Phase 2 — Aesthetic System Foundation | Pending |
+| AEST-03 | Phase 2 — Aesthetic System Foundation | Pending |
+| AEST-04 | Phase 2 — Aesthetic System Foundation | Pending |
+| AEST-05 | Phase 2 — Aesthetic System Foundation | Pending |
+| AEST-06 | Phase 2 — Aesthetic System Foundation | Pending |
+| AEST-07 | Phase 2 — Aesthetic System Foundation | Pending |
+| AEST-08 | Phase 2 — Aesthetic System Foundation | Pending |
+| AEST-09 | Phase 2 — Aesthetic System Foundation | Pending |
+| AEST-10 | Phase 2 — Aesthetic System Foundation | Pending |
+| AEST-11 | Phase 2 — Aesthetic System Foundation | Pending |
+| SIM-01 | Phase 3 — Core Sim Loop | Pending |
+| SIM-02 | Phase 3 — Core Sim Loop | Pending |
+| SIM-03 | Phase 3 — Core Sim Loop | Pending |
+| SIM-04 | Phase 3 — Core Sim Loop | Pending |
+| SIM-05 | Phase 3 — Core Sim Loop | Pending |
+| SIM-06 | Phase 3 — Core Sim Loop | Pending |
+| SIM-07 | Phase 3 — Core Sim Loop | Pending |
+| SIM-08 | Phase 3 — Core Sim Loop | Pending |
+| SIM-09 | Phase 3 — Core Sim Loop | Pending |
+| SIM-10 | Phase 3 — Core Sim Loop | Pending |
+| DEPTH-01 | Phase 4 — Sim Depth | Pending |
+| DEPTH-02 | Phase 4 — Sim Depth | Pending |
+| DEPTH-03 | Phase 4 — Sim Depth | Pending |
+| DEPTH-04 | Phase 4 — Sim Depth | Pending |
+| DEPTH-05 | Phase 4 — Sim Depth | Pending |
+| DEPTH-06 | Phase 4 — Sim Depth | Pending |
+| DEPTH-07 | Phase 4 — Sim Depth | Pending |
+| DEPTH-08 | Phase 4 — Sim Depth | Pending |
+| DEPTH-09 | Phase 4 — Sim Depth | Pending |
+| DEPTH-10 | Phase 4 — Sim Depth | Pending |
+| NFT-01 | Phase 5 — NFT Layer & End State | Pending |
+| NFT-02 | Phase 5 — NFT Layer & End State | Pending |
+| NFT-03 | Phase 5 — NFT Layer & End State | Pending |
+| NFT-04 | Phase 5 — NFT Layer & End State | Pending |
+| NFT-05 | Phase 5 — NFT Layer & End State | Pending |
+| END-01 | Phase 5 — NFT Layer & End State | Pending |
+| END-02 | Phase 5 — NFT Layer & End State | Pending |
+| END-03 | Phase 5 — NFT Layer & End State | Pending |
+| DEPLOY-01 | Phase 6 — Deployment & Polish | Pending |
+| DEPLOY-02 | Phase 6 — Deployment & Polish | Pending |
+| DEPLOY-03 | Phase 6 — Deployment & Polish | Pending |
 
 **Coverage:**
 - v1 requirements: 52 total
-- Mapped to phases: 0
-- Unmapped: 52 ⚠️ (traceability updated after roadmap creation)
+- Mapped to phases: 52
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-06*
-*Last updated: 2026-04-06 after initial definition*
+*Last updated: 2026-04-06 after roadmap creation*
