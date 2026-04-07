@@ -50,8 +50,8 @@
 - [x] **DEPTH-01**: Named artist and collector characters exist with a relationship score that decays exponentially each round without contact
 - [x] **DEPTH-02**: Relationship score affects a named character's bid likelihood in auctions (±10–15% modifier)
 - [x] **DEPTH-03**: A "cold" relationship state is visually indicated before the score hits zero (warning before loss)
-- [ ] **DEPTH-04**: The landlord communicates via text messages in wall-label font, progressing through 5 escalation stages
-- [ ] **DEPTH-05**: Landlord stage progression is gated by gallery Prestige (show history, press coverage, collector visit count)
+- [x] **DEPTH-04**: The landlord communicates via text messages in wall-label font, progressing through 5 escalation stages
+- [x] **DEPTH-05**: Landlord stage progression is gated by gallery Prestige (show history, press coverage, collector visit count)
 - [ ] **DEPTH-06**: Drug inventory is tracked per player and renders on the same appraisal form as the painting collection
 - [ ] **DEPTH-07**: Drug use at parties and art fairs applies a Coolness modifier and Restedness cost
 - [ ] **DEPTH-08**: Carrying drugs above inventory threshold accumulates a passive Risk stat
@@ -156,8 +156,8 @@
 | DEPTH-01 | Phase 4 — Sim Depth | Complete |
 | DEPTH-02 | Phase 4 — Sim Depth | Complete |
 | DEPTH-03 | Phase 4 — Sim Depth | Complete |
-| DEPTH-04 | Phase 4 — Sim Depth | Pending |
-| DEPTH-05 | Phase 4 — Sim Depth | Pending |
+| DEPTH-04 | Phase 4 — Sim Depth | Complete |
+| DEPTH-05 | Phase 4 — Sim Depth | Complete |
 | DEPTH-06 | Phase 4 — Sim Depth | Pending |
 | DEPTH-07 | Phase 4 — Sim Depth | Pending |
 | DEPTH-08 | Phase 4 — Sim Depth | Pending |
