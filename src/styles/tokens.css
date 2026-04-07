@@ -1,0 +1,38 @@
+/*
+ * Phase 2 Aesthetic System — Design Tokens
+ *
+ * Tailwind v4 arbitrary-value syntax for the runtime-swapped --color-accent
+ * custom property: use `bg-[var(--color-accent)]`, `text-[var(--color-accent)]`,
+ * `border-[var(--color-accent)]`. This is the canonical, version-safe form for
+ * Tailwind v4.2.2 (works in all v4 releases). The newer `bg-(--color-accent)`
+ * shorthand exists but we stick with `var()` to avoid surprises across minor
+ * Tailwind versions. Pin this convention for Plans 02 and 03.
+ */
+
+@theme {
+  /* Base palette — generates utilities like bg-paper, text-ink */
+  --color-paper: #fafaf7;
+  --color-ink: #0a0a0a;
+  --color-ink-soft: #4a4a4a;
+  --color-rule: #d4d4d0;
+  --color-stamp: #c1272d;
+
+  /* Neighborhood accent palette — consumed via --color-accent CSS var */
+  --color-gallery: #2e4b8b;
+  --color-warehouse: #d97706;
+  --color-flatlands: #b91c1c;
+  --color-hotel: #c8b88a;
+  --color-online: #0f766e;
+
+  /* Typography */
+  --font-label: 'Special Elite', 'IBM Plex Mono', ui-monospace, monospace;
+  --font-receipt: 'JetBrains Mono', ui-monospace, monospace;
+  --font-broken: 'NonexistentFontXYZ123', 'Comic Sans MS', cursive;
+
+  --tracking-label: 0.18em;
+}
+
+/* Default active accent (runtime override lives on NeighborhoodProvider wrapper) */
+:root {
+  --color-accent: var(--color-gallery);
+}

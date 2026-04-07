@@ -1,0 +1,107 @@
+/*
+ * Phase 2 Aesthetic System — Keyframes & Motion Primitives
+ *
+ * CSS-driven animations (compositor-thread, cheap) for receipt print,
+ * typewriter reveal, and Online neighborhood accent flicker.
+ */
+
+@keyframes receipt-print {
+  0% {
+    clip-path: inset(0 0 100% 0);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.receipt-print {
+  animation: receipt-print 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes typewriter {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.typewriter {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  animation: typewriter 1.2s steps(40, end) both;
+}
+
+@keyframes blink-caret {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.dotted-rule {
+  border-top: 1px dashed var(--color-rule);
+}
+
+/*
+ * Online accent flicker — discrete step() swaps of --color-accent at
+ * irregular intervals over a 7s loop. Cascades down to descendants via
+ * `bg-[var(--color-accent)]` utilities.
+ */
+@keyframes online-accent-flicker {
+  0% {
+    --color-accent: var(--color-online);
+  }
+  12% {
+    --color-accent: var(--color-online);
+  }
+  12.5% {
+    --color-accent: var(--color-flatlands);
+  }
+  13% {
+    --color-accent: var(--color-online);
+  }
+  47% {
+    --color-accent: var(--color-online);
+  }
+  47.5% {
+    --color-accent: var(--color-warehouse);
+  }
+  48% {
+    --color-accent: var(--color-online);
+  }
+  71% {
+    --color-accent: var(--color-online);
+  }
+  71.5% {
+    --color-accent: var(--color-gallery);
+  }
+  72% {
+    --color-accent: var(--color-online);
+  }
+  100% {
+    --color-accent: var(--color-online);
+  }
+}
+
+.neighborhood-online {
+  font-family: var(--font-broken);
+  --color-accent: var(--color-online);
+  animation: online-accent-flicker 7s steps(1, end) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .neighborhood-online {
+    animation: none;
+  }
+  .receipt-print,
+  .typewriter {
+    animation: none;
+  }
+}
