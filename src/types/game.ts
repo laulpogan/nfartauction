@@ -172,6 +172,33 @@ export interface TimeSlot {
   id: string
   type: SlotType
   neighborhood: Neighborhood | null
+  /**
+   * Optional character id for relationship-affecting slots.
+   * Only honored by studio_visits / opening / art_fair resolution paths;
+   * other slot types ignore this field. The engine's updateRelationship
+   * silently no-ops on unknown ids (defense in depth for T-4-01).
+   */
+  targetCharacterId?: string
+}
+
+// ─── Phase 4: Relationship system ──────────────────────────────────────────
+
+export type Faction = 'painters' | 'sculptors' | 'video_art' | 'social_political'
+export type RelationshipCharacterKind = 'artist' | 'collector'
+
+export interface Relationship {
+  /** Stable id, e.g. 'artist:lite_metal' or 'collector:helena_v' */
+  characterId: string
+  kind: RelationshipCharacterKind
+  displayName: string
+  bio: string
+  factionAlignment: Faction
+  /** Score range [-50, 100]. Negative reserved for the dropped-artist seed. */
+  score: number
+  /** Sim days since last positive contact. Resets on updateRelationship(+). */
+  decayTimer: number
+  /** The one artist the player "shouldn't have dropped" (server-seeded). */
+  isDroppedArtist: boolean
 }
 
 // Per-slot stat deltas. Money is included so the dev transaction log can
@@ -196,12 +223,19 @@ export interface PlayerSimState {
   luck: number
   currentNeighborhood: Neighborhood
   scheduledSlots: TimeSlot[]
-  // Phase 4 stubs — present as types but inert this phase. The privacy model
-  // demands these fields exist now so the server channel boundary is correct
-  // before the mechanics land.
+  // Phase 4 Plan 01: real relationship array replaces the Phase 3 stub.
+  relationships: Relationship[]
+  // Phase 4 Plan 03 stub — still inert this plan.
   drugInventory: never[]
-  relationships: never[]
-  faction: null
+  // Phase 4 Plan 01: the `droppedArtist` is the Artist the player "shouldn't
+  // have dropped" — server-seeded at game start via seedDroppedArtist().
+  // The canonical source of truth is the corresponding Relationship with
+  // isDroppedArtist=true; this field is a quick-lookup mirror.
+  droppedArtist: Artist | null
+  // Faction alignment is DERIVED, never stored. Use deriveFactionAlignment()
+  // in sim-engine to compute it on read. The field is intentionally omitted
+  // from this interface so writing `playerSim.faction = ...` is a compile
+  // error — if you want the faction, call the derivation function.
 }
 
 export interface SimState {

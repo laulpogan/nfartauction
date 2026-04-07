@@ -51,7 +51,7 @@ const playerSim: PlayerSimState = {
   scheduledSlots: [],
   drugInventory: [],
   relationships: [],
-  faction: null,
+  droppedArtist: null,
 }
 
 describe('SimPanel', () => {

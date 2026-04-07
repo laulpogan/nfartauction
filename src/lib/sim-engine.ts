@@ -22,13 +22,25 @@ import type {
   TimeSlot,
   SimEvent,
   PublicPlayer,
+  Relationship,
+  Faction,
+  Artist,
 } from '../types/game'
-import { SLOT_DEFINITIONS, SIM_CONFIG } from './sim-config'
+import { SLOT_DEFINITIONS, SIM_CONFIG, RELATIONSHIP_CONFIG } from './sim-config'
 
 export interface ResolveSlotsResult {
   updatedPlayerSim: PlayerSimState
   updatedPlayerMoney: number
   events: SimEvent[]
+  /** Character IDs contacted during this slot plan. Server feeds this into advanceDay → decayRelationships. */
+  contactedThisDay: Set<string>
+}
+
+/** Slot types that can carry a targetCharacterId and produce a relationship contact. */
+const RELATIONSHIP_SLOT_DELTAS: Partial<Record<TimeSlot['type'], number>> = {
+  studio_visits: 8,
+  opening: 8,
+  art_fair: 12,
 }
 
 /**
@@ -47,7 +59,9 @@ export function resolveSlots(
   let luck = playerSim.luck
   let money = player.money
   let currentNeighborhood = playerSim.currentNeighborhood
+  let relationships = playerSim.relationships
   const events: SimEvent[] = []
+  const contactedThisDay = new Set<string>()
 
   for (const slot of slots) {
     // Travel resolution: if slot has a target neighborhood and it differs
@@ -93,6 +107,24 @@ export function resolveSlots(
         luck: luck - beforeLuck,
       },
     })
+
+    // Phase 4 Plan 01: relationship contact path. Only honored for the three
+    // slot types in RELATIONSHIP_SLOT_DELTAS; other slot types silently
+    // ignore targetCharacterId (T-4-01 defense-in-depth, plus Zod already
+    // validates the string shape at the server boundary).
+    const relDelta = RELATIONSHIP_SLOT_DELTAS[slot.type]
+    if (relDelta !== undefined && slot.targetCharacterId) {
+      const before = relationships.find(r => r.characterId === slot.targetCharacterId)
+      if (before) {
+        relationships = updateRelationship(relationships, slot.targetCharacterId, relDelta)
+        contactedThisDay.add(slot.targetCharacterId)
+        events.push({
+          kind: 'relationship',
+          description: `contact ${before.displayName} (+${relDelta})`,
+          statDeltas: {},
+        })
+      }
+    }
   }
 
   return {
@@ -102,11 +134,13 @@ export function resolveSlots(
       restedness,
       luck,
       currentNeighborhood,
+      relationships,
       // Clear scheduledSlots — the day's plan has been executed.
       scheduledSlots: [],
     },
     updatedPlayerMoney: money,
     events,
+    contactedThisDay,
   }
 }
 
@@ -136,13 +170,185 @@ export function advanceDay(
   sim: SimState,
   allPlayerSims: PlayerSimState[],
   drift: { hotness: number; gent: number; nft: number } = { hotness: 0, gent: 0, nft: 0 },
+  contactedByPlayer?: Map<string, Set<string>>,
 ): { updatedSim: SimState; updatedPlayerSims: PlayerSimState[] } {
   const drifted = applyGlobalStatDrift(sim, drift)
   const updatedSim: SimState = {
     ...drifted,
     dayNumber: sim.dayNumber + 1,
   }
-  return { updatedSim, updatedPlayerSims: allPlayerSims }
+  // Phase 4 Plan 01: decay relationships per player. The server owns the
+  // contacted set derived from that day's resolveSlots return value. If the
+  // map is not provided (legacy callers / tests), treat every player's
+  // contact set as empty — which decays everything, consistent with the
+  // "nobody got called today" path.
+  const updatedPlayerSims = allPlayerSims.map(ps => {
+    const contacted = contactedByPlayer?.get(ps.sessionId) ?? new Set<string>()
+    return {
+      ...ps,
+      relationships: decayRelationships(ps.relationships, contacted, updatedSim.dayNumber),
+    }
+  })
+  return { updatedSim, updatedPlayerSims }
+}
+
+// ─── Phase 4 Plan 01: Relationship pure functions ──────────────────────────
+
+/**
+ * Apply exponential decay to all relationships NOT in the contacted set.
+ * Contacted relationships are left unchanged here — the positive-delta path
+ * is updateRelationship, called inside resolveSlots per slot contact event.
+ *
+ * Pure: returns a new array; never mutates input.
+ *
+ * Invariants:
+ *  - Non-contacted, non-dropped: score = max(0, score * decayFactor); decayTimer += 1
+ *  - Non-contacted, dropped artist: score is frozen at droppedSeedScore (-50);
+ *    decayTimer still ticks (so contact recency is visible).
+ *  - Contacted: unchanged in-place (updateRelationship is the write path).
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function decayRelationships(
+  relationships: Relationship[],
+  contactedIds: Set<string>,
+  _currentDay: number,
+): Relationship[] {
+  return relationships.map(r => {
+    if (contactedIds.has(r.characterId)) return r
+    if (r.isDroppedArtist) {
+      // Dropped artist score is locked at the seed value until a positive
+      // contact is made (via updateRelationship). Decay timer still ticks.
+      return { ...r, decayTimer: r.decayTimer + 1 }
+    }
+    // Exponential decay with a hard floor: once score drops below 1, snap
+    // to 0 so the relationship is visibly dead (otherwise 0.85^n asymptotes).
+    const decayed = r.score * RELATIONSHIP_CONFIG.decayFactor
+    const next = decayed < 1 ? 0 : decayed
+    return { ...r, score: next, decayTimer: r.decayTimer + 1 }
+  })
+}
+
+/**
+ * Apply a delta to a single relationship score, clamped to [-50, 100].
+ * Unknown characterIds return the input array unchanged (T-4-01: defense
+ * against client-supplied slot.targetCharacterId that doesn't match any
+ * real relationship). Positive deltas reset decayTimer to 0.
+ */
+export function updateRelationship(
+  relationships: Relationship[],
+  characterId: string,
+  scoreDelta: number,
+): Relationship[] {
+  const idx = relationships.findIndex(r => r.characterId === characterId)
+  if (idx === -1) return relationships
+  const current = relationships[idx]
+  const nextScore = clamp(
+    current.score + scoreDelta,
+    RELATIONSHIP_CONFIG.droppedSeedScore,
+    100,
+  )
+  const nextTimer = scoreDelta > 0 ? 0 : current.decayTimer
+  const next: Relationship = { ...current, score: nextScore, decayTimer: nextTimer }
+  const out = relationships.slice()
+  out[idx] = next
+  return out
+}
+
+/**
+ * Derive faction alignment as a positive-score aggregation. Negative scores
+ * (including the dropped artist) are excluded — a player doesn't "gain"
+ * painters alignment from hating a painter. Pure: no state stored.
+ */
+export function deriveFactionAlignment(
+  relationships: Relationship[],
+): Record<Faction, number> {
+  const totals: Record<Faction, number> = {
+    painters: 0,
+    sculptors: 0,
+    video_art: 0,
+    social_political: 0,
+  }
+  for (const r of relationships) {
+    if (r.score <= 0) continue
+    totals[r.factionAlignment] += r.score
+  }
+  return totals
+}
+
+/**
+ * Project each relationship into a bid-likelihood modifier in [-0.15, +0.15].
+ *  - score ≥ 75: +0.10 → +0.15 linear from 75 to 100
+ *  - score ≤ 25 (cold, non-dropped): -0.10 → -0.15 linear from 25 to 0
+ *  - isDroppedArtist: always -0.15
+ *  - else: 0 (neutral band 25 < score < 75)
+ *
+ * The auction layer keys into this by characterId ('artist:<artistId>') to
+ * look up a per-artist bid-behavior tweak.
+ */
+export function deriveBidLikelihoodModifiers(
+  relationships: Relationship[],
+): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const r of relationships) {
+    if (r.isDroppedArtist) {
+      out[r.characterId] = -RELATIONSHIP_CONFIG.bidModMaxAbs
+      continue
+    }
+    if (r.score >= 75) {
+      // 75 → 0.10, 100 → 0.15
+      const t = (r.score - 75) / 25 // 0..1
+      out[r.characterId] = 0.10 + t * 0.05
+    } else if (r.score <= 25 && r.score >= 0) {
+      // 25 → -0.10, 0 → -0.15
+      const t = (25 - r.score) / 25 // 0..1
+      out[r.characterId] = -(0.10 + t * 0.05)
+    } else {
+      out[r.characterId] = 0
+    }
+  }
+  return out
+}
+
+/**
+ * Credibility penalty from "the artist you shouldn't have dropped". The
+ * penalty is -round(roundValues[droppedArtist] * credibilityScale) so it
+ * scales with the dropped artist's cumulative market value over the game.
+ * Returns { penalty: 0, droppedArtist: null } when no dropped artist is set.
+ */
+export function deriveCredibilityPenalty(
+  relationships: Relationship[],
+  roundValues: Record<Artist, number>,
+): { penalty: number; droppedArtist: Artist | null } {
+  const dropped = relationships.find(r => r.isDroppedArtist && r.kind === 'artist')
+  if (!dropped) return { penalty: 0, droppedArtist: null }
+  // characterId for artists is 'artist:<artistId>'; strip the prefix.
+  const artist = dropped.characterId.replace(/^artist:/, '') as Artist
+  const marketValue = roundValues[artist] ?? 0
+  const penalty = -Math.round(marketValue * RELATIONSHIP_CONFIG.credibilityScale)
+  return { penalty, droppedArtist: artist }
+}
+
+/**
+ * Seed a PlayerSimState with a dropped artist. Pure helper — Math.random
+ * lives in the SERVER (party/server.ts) which calls this with the chosen
+ * artist. sim-engine remains zero-side-effect.
+ */
+export function seedDroppedArtist(
+  playerSim: PlayerSimState,
+  artist: Artist,
+): PlayerSimState {
+  const targetId = `artist:${artist}`
+  const relationships = playerSim.relationships.map(r =>
+    r.characterId === targetId
+      ? {
+          ...r,
+          score: RELATIONSHIP_CONFIG.droppedSeedScore,
+          isDroppedArtist: true,
+          decayTimer: 0,
+        }
+      : r,
+  )
+  return { ...playerSim, relationships, droppedArtist: artist }
 }
 
 export interface AuctionModifiers {
@@ -178,7 +384,7 @@ export { createInitialPlayerSimState, createInitialSimState } from './sim-config
 
 // Also re-export SIM_CONFIG so callers don't need to import two modules
 // just to read the timeout constant.
-export { SIM_CONFIG } from './sim-config'
+export { SIM_CONFIG, RELATIONSHIP_CONFIG, RELATIONSHIP_DEFINITIONS } from './sim-config'
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n))

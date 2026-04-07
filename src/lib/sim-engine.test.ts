@@ -6,8 +6,22 @@ import {
   applySimModifiers,
   createInitialPlayerSimState,
   createInitialSimState,
+  decayRelationships,
+  updateRelationship,
+  deriveFactionAlignment,
+  deriveBidLikelihoodModifiers,
+  deriveCredibilityPenalty,
+  seedDroppedArtist,
+  RELATIONSHIP_CONFIG,
 } from './sim-engine'
-import type { PlayerSimState, SimState, TimeSlot, PublicPlayer } from '../types/game'
+import type {
+  PlayerSimState,
+  SimState,
+  TimeSlot,
+  PublicPlayer,
+  Relationship,
+  Artist,
+} from '../types/game'
 
 // ─── Test fixtures ──────────────────────────────────────────────────────────
 
@@ -176,11 +190,16 @@ describe('advanceDay', () => {
     expect(updatedSim.dayNumber).toBe(1)
   })
 
-  it('passes player sims through unchanged (Phase 4 will mutate them)', () => {
+  it('decays relationships by default when no contact set is provided (Phase 4)', () => {
     const a = makeSim({ sessionId: 'a' })
     const b = makeSim({ sessionId: 'b' })
     const { updatedPlayerSims } = advanceDay(makeGlobal(), [a, b])
-    expect(updatedPlayerSims).toEqual([a, b])
+    // Non-relationship fields preserved
+    expect(updatedPlayerSims[0].sessionId).toBe('a')
+    expect(updatedPlayerSims[1].sessionId).toBe('b')
+    expect(updatedPlayerSims[0].coolness).toBe(a.coolness)
+    // Relationships decayed (no contacts)
+    expect(updatedPlayerSims[0].relationships[0].score).toBeCloseTo(a.relationships[0].score * 0.85)
   })
 })
 
@@ -218,5 +237,256 @@ describe('applySimModifiers', () => {
   it('luckRoll mirrors playerSim.luck', () => {
     const r = applySimModifiers(makePlayer(), makeSim({ luck: 73 }), makeGlobal())
     expect(r.luckRoll).toBe(73)
+  })
+})
+
+// ─── Phase 4 Plan 01: Relationship system ──────────────────────────────────
+
+function makeRel(overrides: Partial<Relationship> = {}): Relationship {
+  return {
+    characterId: 'artist:lite_metal',
+    kind: 'artist',
+    displayName: 'Lite Metal',
+    bio: 'test',
+    factionAlignment: 'painters',
+    score: 50,
+    decayTimer: 0,
+    isDroppedArtist: false,
+    ...overrides,
+  }
+}
+
+describe('decayRelationships', () => {
+  it('leaves contacted relationships unchanged and ticks non-contacted ones by 0.85', () => {
+    const rels: Relationship[] = [
+      makeRel({ characterId: 'artist:yoko', score: 50 }),
+      makeRel({ characterId: 'artist:krypto', score: 80 }),
+    ]
+    const out = decayRelationships(rels, new Set(['artist:yoko']), 1)
+    expect(out[0].score).toBe(50) // contacted → unchanged
+    expect(out[0].decayTimer).toBe(0)
+    expect(out[1].score).toBeCloseTo(80 * 0.85)
+    expect(out[1].decayTimer).toBe(1)
+  })
+
+  it('floors non-dropped score at 0 after repeated decay', () => {
+    const rels = [makeRel({ score: 10 })]
+    // One tick: still above the snap floor.
+    const once = decayRelationships(rels, new Set(), 1)
+    expect(once[0].score).toBeCloseTo(10 * 0.85)
+    // After many ticks, the <1 snap floor zeroes it out.
+    let cur = rels
+    for (let i = 0; i < 50; i++) {
+      cur = decayRelationships(cur, new Set(), i)
+    }
+    expect(cur[0].score).toBe(0)
+  })
+
+  it('dropped artist score is frozen at the seed value (-50) and does NOT decay', () => {
+    const rels = [
+      makeRel({ characterId: 'artist:lite_metal', score: -50, isDroppedArtist: true }),
+    ]
+    const out = decayRelationships(rels, new Set(), 1)
+    expect(out[0].score).toBe(-50)
+    expect(out[0].decayTimer).toBe(1) // timer still ticks
+  })
+
+  it('does not mutate the input array', () => {
+    const rels = [makeRel({ score: 60 })]
+    const out = decayRelationships(rels, new Set(), 1)
+    expect(rels[0].score).toBe(60) // input untouched
+    expect(out).not.toBe(rels)
+  })
+})
+
+describe('updateRelationship', () => {
+  it('clamps positive delta to a ceiling of 100', () => {
+    const rels = [makeRel({ score: 95 })]
+    const out = updateRelationship(rels, 'artist:lite_metal', 20)
+    expect(out[0].score).toBe(100)
+  })
+
+  it('clamps negative delta to a floor of -50 (dropped range)', () => {
+    const rels = [makeRel({ score: -40 })]
+    const out = updateRelationship(rels, 'artist:lite_metal', -100)
+    expect(out[0].score).toBe(-50)
+  })
+
+  it('returns input unchanged when characterId not found', () => {
+    const rels = [makeRel({ score: 50 })]
+    const out = updateRelationship(rels, 'collector:nobody', 10)
+    expect(out).toBe(rels)
+  })
+
+  it('resets decayTimer on positive delta', () => {
+    const rels = [makeRel({ score: 30, decayTimer: 5 })]
+    const out = updateRelationship(rels, 'artist:lite_metal', 5)
+    expect(out[0].decayTimer).toBe(0)
+    expect(out[0].score).toBe(35)
+  })
+})
+
+describe('deriveFactionAlignment', () => {
+  it('sums positive scores by factionAlignment, excluding zero/negative', () => {
+    const rels: Relationship[] = [
+      makeRel({ characterId: 'a', score: 60, factionAlignment: 'painters' }),
+      makeRel({ characterId: 'b', score: 40, factionAlignment: 'painters' }),
+      makeRel({ characterId: 'c', score: 0, factionAlignment: 'sculptors' }),
+      makeRel({ characterId: 'd', score: -50, factionAlignment: 'video_art', isDroppedArtist: true }),
+      makeRel({ characterId: 'e', score: 20, factionAlignment: 'social_political' }),
+    ]
+    const f = deriveFactionAlignment(rels)
+    expect(f.painters).toBe(100)
+    expect(f.sculptors).toBe(0)
+    expect(f.video_art).toBe(0)
+    expect(f.social_political).toBe(20)
+  })
+})
+
+describe('deriveBidLikelihoodModifiers', () => {
+  it('returns 0 for neutral band (25 < score < 75)', () => {
+    const out = deriveBidLikelihoodModifiers([makeRel({ score: 50 })])
+    expect(out['artist:lite_metal']).toBe(0)
+  })
+
+  it('returns positive in [0.10, 0.15] for hot scores (≥75)', () => {
+    const out = deriveBidLikelihoodModifiers([
+      makeRel({ characterId: 'a', score: 75 }),
+      makeRel({ characterId: 'b', score: 90 }),
+      makeRel({ characterId: 'c', score: 100 }),
+    ])
+    expect(out.a).toBeCloseTo(0.10)
+    expect(out.b).toBeGreaterThan(0.10)
+    expect(out.b).toBeLessThan(0.15)
+    expect(out.c).toBeCloseTo(0.15)
+  })
+
+  it('returns negative in [-0.15, -0.10] for cold scores (≤25)', () => {
+    const out = deriveBidLikelihoodModifiers([
+      makeRel({ characterId: 'a', score: 25 }),
+      makeRel({ characterId: 'b', score: 10 }),
+      makeRel({ characterId: 'c', score: 0 }),
+    ])
+    expect(out.a).toBeCloseTo(-0.10)
+    expect(out.b).toBeLessThan(-0.10)
+    expect(out.b).toBeGreaterThan(-0.15)
+    expect(out.c).toBeCloseTo(-0.15)
+  })
+
+  it('returns -0.15 for dropped artist regardless of score', () => {
+    const out = deriveBidLikelihoodModifiers([
+      makeRel({ characterId: 'artist:lite_metal', score: -50, isDroppedArtist: true }),
+    ])
+    expect(out['artist:lite_metal']).toBeCloseTo(-RELATIONSHIP_CONFIG.bidModMaxAbs)
+  })
+})
+
+describe('deriveCredibilityPenalty', () => {
+  const zeroRoundValues: Record<Artist, number> = {
+    lite_metal: 0, yoko: 0, christine_p: 0, karl_gitter: 0, krypto: 0,
+  }
+
+  it('returns 0 penalty when no dropped artist is set', () => {
+    const rels = [makeRel({ score: 50 })]
+    const r = deriveCredibilityPenalty(rels, zeroRoundValues)
+    expect(r.penalty).toBe(0)
+    expect(r.droppedArtist).toBeNull()
+  })
+
+  it('scales linearly with roundValues[droppedArtist]', () => {
+    const rels = [makeRel({ characterId: 'artist:yoko', score: -50, isDroppedArtist: true, factionAlignment: 'social_political', displayName: 'Yoko' })]
+    const rv: Record<Artist, number> = { ...zeroRoundValues, yoko: 20000 }
+    const r = deriveCredibilityPenalty(rels, rv)
+    expect(r.droppedArtist).toBe('yoko')
+    expect(r.penalty).toBe(-Math.round(20000 * RELATIONSHIP_CONFIG.credibilityScale))
+  })
+})
+
+describe('seedDroppedArtist', () => {
+  it('marks the matching artist relationship with isDroppedArtist and seed score', () => {
+    const ps = createInitialPlayerSimState('s0')
+    const seeded = seedDroppedArtist(ps, 'krypto')
+    const kr = seeded.relationships.find(r => r.characterId === 'artist:krypto')!
+    expect(kr.isDroppedArtist).toBe(true)
+    expect(kr.score).toBe(RELATIONSHIP_CONFIG.droppedSeedScore)
+    expect(seeded.droppedArtist).toBe('krypto')
+    // Other relationships untouched
+    const others = seeded.relationships.filter(r => r.characterId !== 'artist:krypto')
+    for (const o of others) {
+      expect(o.isDroppedArtist).toBe(false)
+      expect(o.score).toBe(RELATIONSHIP_CONFIG.initialScore)
+    }
+  })
+})
+
+describe('resolveSlots with targetCharacterId', () => {
+  it('studio_visits with targetCharacterId bumps the relationship by +8 and adds to contactedThisDay', () => {
+    const ps = createInitialPlayerSimState('s0')
+    const player = makePlayer({ money: 100000 })
+    const slots: TimeSlot[] = [
+      { id: 'x', type: 'studio_visits', neighborhood: 'gallery', targetCharacterId: 'artist:lite_metal' },
+    ]
+    const r = resolveSlots(ps, slots, makeGlobal(), player)
+    const lm = r.updatedPlayerSim.relationships.find(x => x.characterId === 'artist:lite_metal')!
+    expect(lm.score).toBe(RELATIONSHIP_CONFIG.initialScore + 8)
+    expect(r.contactedThisDay.has('artist:lite_metal')).toBe(true)
+    expect(r.events.some(e => e.kind === 'relationship')).toBe(true)
+  })
+
+  it('art_fair with targetCharacterId applies a +12 bump', () => {
+    const ps = createInitialPlayerSimState('s0')
+    const player = makePlayer({ money: 100000 })
+    const slots: TimeSlot[] = [
+      { id: 'x', type: 'art_fair', neighborhood: 'gallery', targetCharacterId: 'collector:helena_v' },
+    ]
+    const r = resolveSlots(ps, slots, makeGlobal(), player)
+    const h = r.updatedPlayerSim.relationships.find(x => x.characterId === 'collector:helena_v')!
+    expect(h.score).toBe(RELATIONSHIP_CONFIG.initialScore + 12)
+  })
+
+  it('unknown targetCharacterId is a silent no-op (T-4-01 defense in depth)', () => {
+    const ps = createInitialPlayerSimState('s0')
+    const player = makePlayer({ money: 100000 })
+    const slots: TimeSlot[] = [
+      { id: 'x', type: 'opening', neighborhood: 'gallery', targetCharacterId: 'artist:fake_person' },
+    ]
+    const r = resolveSlots(ps, slots, makeGlobal(), player)
+    expect(r.contactedThisDay.size).toBe(0)
+    // No relationship event emitted for unknown ids
+    expect(r.events.some(e => e.kind === 'relationship')).toBe(false)
+  })
+
+  it('gallery_work ignores targetCharacterId entirely (not a relationship slot)', () => {
+    const ps = createInitialPlayerSimState('s0')
+    const player = makePlayer({ money: 100000 })
+    const slots: TimeSlot[] = [
+      { id: 'x', type: 'gallery_work', neighborhood: 'gallery', targetCharacterId: 'artist:lite_metal' },
+    ]
+    const r = resolveSlots(ps, slots, makeGlobal(), player)
+    const lm = r.updatedPlayerSim.relationships.find(x => x.characterId === 'artist:lite_metal')!
+    expect(lm.score).toBe(RELATIONSHIP_CONFIG.initialScore) // unchanged
+    expect(r.contactedThisDay.size).toBe(0)
+  })
+})
+
+describe('advanceDay with contactedByPlayer', () => {
+  it('decays relationships only for non-contacted characters per player', () => {
+    const a = createInitialPlayerSimState('a')
+    const b = createInitialPlayerSimState('b')
+    const contacted = new Map<string, Set<string>>()
+    contacted.set('a', new Set(['artist:lite_metal'])) // a contacted lite_metal
+    contacted.set('b', new Set())                        // b contacted nobody
+    const { updatedPlayerSims } = advanceDay(makeGlobal(), [a, b], undefined, contacted)
+    const aLM = updatedPlayerSims[0].relationships.find(r => r.characterId === 'artist:lite_metal')!
+    const bLM = updatedPlayerSims[1].relationships.find(r => r.characterId === 'artist:lite_metal')!
+    expect(aLM.score).toBe(RELATIONSHIP_CONFIG.initialScore) // unchanged
+    expect(bLM.score).toBeCloseTo(RELATIONSHIP_CONFIG.initialScore * 0.85)
+  })
+
+  it('treats missing contactedByPlayer as empty (all relationships decay)', () => {
+    const a = createInitialPlayerSimState('a')
+    const { updatedPlayerSims } = advanceDay(makeGlobal(), [a])
+    const lm = updatedPlayerSims[0].relationships.find(r => r.characterId === 'artist:lite_metal')!
+    expect(lm.score).toBeCloseTo(RELATIONSHIP_CONFIG.initialScore * 0.85)
   })
 })
