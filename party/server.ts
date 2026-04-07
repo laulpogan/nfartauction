@@ -12,7 +12,12 @@ import {
   passFixedPrice, placeOpenBid, endOpenAuction, placeOnceAroundBid,
   submitSealedBid, endRound, startGame,
 } from '../src/lib/engine'
-import { resolveSlots, advanceDay, seedDroppedArtist } from '../src/lib/sim-engine'
+import {
+  resolveSlots,
+  advanceDay,
+  seedDroppedArtist,
+  progressLandlord,
+} from '../src/lib/sim-engine'
 import {
   SIM_CONFIG,
   createInitialPlayerSimState,
@@ -728,6 +733,20 @@ export default class GameServer implements Party.Server {
           coolness: updatedPlayerSim.coolness,
         }
       })
+
+      // Phase 4 Plan 02: landlord arc progression. Runs per player AFTER
+      // the resolveSlots loop but BEFORE advanceDay, so the landlordStage
+      // advance is visible in the same sim_day → auction_round transition
+      // that the rest of the day's resolution emits. progressLandlord is a
+      // pure one-way ratchet gated on PublicPlayer.prestige (server-
+      // authoritative, T-4-10). Per-player private mutation — landlord
+      // state lives in PlayerSimState and never reaches derivePublicState.
+      for (const p of players) {
+        const ps = updatedPlayerSimMap[p.sessionId]
+        if (!ps) continue
+        const { updatedPlayerSim: afterLandlord } = progressLandlord(ps, p.prestige)
+        updatedPlayerSimMap[p.sessionId] = afterLandlord
+      }
 
       // Advance global sim state. Drift is deterministically zero for now;
       // a seeded PRNG will own this in a follow-up plan. Decay is per-player

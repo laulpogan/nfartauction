@@ -12,6 +12,7 @@ import { NeighborhoodMap } from './NeighborhoodMap'
 import { SlotPicker } from './SlotPicker'
 import { DayResultReceipt } from './DayResultReceipt'
 import { RelationshipPanel } from './RelationshipPanel'
+import { LandlordMessages } from './LandlordMessages'
 
 export interface SimPanelProps {
   game: GameState | null
@@ -71,6 +72,7 @@ export function SimPanel({
           playerSim={playerSim}
           roundValues={game?.roundValues ?? null}
         />
+        <LandlordMessages playerSim={playerSim} />
         <NeighborhoodMap
           selected={selectedNeighborhood}
           onSelect={setSelectedNeighborhood}
