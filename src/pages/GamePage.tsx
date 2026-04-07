@@ -2,6 +2,7 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { useGame } from '../hooks/useGame'
 import { GameBoard } from '../components/game/GameBoard'
 import { WaitingRoom } from '../components/lobby/WaitingRoom'
+import { SimPanel } from '../components/sim/SimPanel'
 import { NeighborhoodProvider } from '../contexts/NeighborhoodContext'
 
 export function GamePage() {
@@ -11,7 +12,7 @@ export function GamePage() {
   const playerName = searchParams.get('name') ?? localStorage.getItem('ma_display_name') ?? 'Player'
 
   const {
-    game, hand, myPlayerIdx, isMyTurn, isAuctioneer, myMoney,
+    game, hand, myPlayerIdx, isMyTurn, isAuctioneer, myMoney, playerSim,
     roundEndResult, setRoundEndResult, connected, error, sessionId, actions,
   } = useGame(code ?? null, playerName)
 
@@ -46,28 +47,69 @@ export function GamePage() {
 
   if (!game) return null
 
-  if (game.status === 'lobby') {
-    const isHost = game.players.find(p => p.sessionId === sessionId)?.isHost ?? false
+  const phase = game.phase
+
+  // Defensive fallback for legacy persisted rooms without phase.
+  if (!phase) {
+    if (game.status === 'lobby') {
+      const isHost = game.players.find(p => p.sessionId === sessionId)?.isHost ?? false
+      return (
+        <WaitingRoom
+          game={game}
+          isHost={isHost}
+          onStartGame={actions.startGame}
+        />
+      )
+    }
     return (
-      <WaitingRoom
+      <GameBoard
         game={game}
-        isHost={isHost}
-        onStartGame={actions.startGame}
+        hand={hand}
+        myPlayerIdx={myPlayerIdx}
+        isMyTurn={isMyTurn}
+        isAuctioneer={isAuctioneer}
+        myMoney={myMoney}
+        roundEndResult={roundEndResult}
+        onDismissRoundEnd={() => setRoundEndResult(null)}
+        actions={actions}
       />
     )
   }
 
-  return (
-    <GameBoard
-      game={game}
-      hand={hand}
-      myPlayerIdx={myPlayerIdx}
-      isMyTurn={isMyTurn}
-      isAuctioneer={isAuctioneer}
-      myMoney={myMoney}
-      roundEndResult={roundEndResult}
-      onDismissRoundEnd={() => setRoundEndResult(null)}
-      actions={actions}
-    />
-  )
+  switch (phase.type) {
+    case 'lobby': {
+      const isHost = game.players.find(p => p.sessionId === sessionId)?.isHost ?? false
+      return (
+        <WaitingRoom
+          game={game}
+          isHost={isHost}
+          onStartGame={actions.startGame}
+        />
+      )
+    }
+    case 'sim_day':
+      return (
+        <SimPanel
+          game={game}
+          playerSim={playerSim}
+          sessionId={sessionId}
+          submitSlots={actions.submitSlots}
+        />
+      )
+    case 'auction_round':
+    case 'game_over':
+      return (
+        <GameBoard
+          game={game}
+          hand={hand}
+          myPlayerIdx={myPlayerIdx}
+          isMyTurn={isMyTurn}
+          isAuctioneer={isAuctioneer}
+          myMoney={myMoney}
+          roundEndResult={roundEndResult}
+          onDismissRoundEnd={() => setRoundEndResult(null)}
+          actions={actions}
+        />
+      )
+  }
 }
