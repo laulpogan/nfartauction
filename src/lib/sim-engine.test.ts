@@ -17,11 +17,17 @@ import {
   removeDrugItem,
   applyDrugEffects,
   accumulateRisk,
+  convertNft,
+  purchaseNftWhitelist,
+  applyNftHypeDrift,
+  computeNftExchangeRate,
   RELATIONSHIP_CONFIG,
   LANDLORD_CONFIG,
   LANDLORD_MESSAGES,
   DRUG_CONFIG,
   DRUG_DEFINITIONS,
+  NFT_CONFIG,
+  NFT_ITEM_DEFINITIONS,
 } from './sim-engine'
 import type {
   PlayerSimState,
@@ -689,5 +695,107 @@ describe('accumulateRisk', () => {
     const snapshot = JSON.parse(JSON.stringify(ps))
     accumulateRisk(ps)
     expect(ps).toEqual(snapshot)
+  })
+})
+
+// ─── Phase 5 Plan 01: NFT system ───────────────────────────────────────────
+
+describe('NFT system', () => {
+  describe('computeNftExchangeRate', () => {
+    it('returns 0.5 at hype 0', () => {
+      expect(computeNftExchangeRate(0)).toBeCloseTo(0.5)
+    })
+    it('returns 1.25 at hype 50', () => {
+      expect(computeNftExchangeRate(50)).toBeCloseTo(1.25)
+    })
+    it('returns 2.0 at hype 100', () => {
+      expect(computeNftExchangeRate(100)).toBeCloseTo(2.0)
+    })
+  })
+
+  describe('applyNftHypeDrift', () => {
+    it('applies a positive delta', () => {
+      expect(applyNftHypeDrift(40, 7)).toBe(47)
+    })
+    it('clamps at 100 on overshoot', () => {
+      expect(applyNftHypeDrift(95, 20)).toBe(100)
+    })
+    it('clamps at 0 on undershoot', () => {
+      expect(applyNftHypeDrift(5, -20)).toBe(0)
+    })
+  })
+
+  describe('convertNft', () => {
+    it('debits nftWallet and returns floor(amount * rate) as moneyDelta', () => {
+      const ps = { ...createInitialPlayerSimState('s0'), nftWallet: 5 }
+      const { updatedPlayerSim, moneyDelta } = convertNft(ps, 4, 1.25)
+      expect(updatedPlayerSim.nftWallet).toBe(1)
+      expect(moneyDelta).toBe(5) // floor(4 * 1.25) = 5
+    })
+
+    it('rejects on overdraft (amount > nftWallet)', () => {
+      const ps = { ...createInitialPlayerSimState('s0'), nftWallet: 3 }
+      const { updatedPlayerSim, moneyDelta } = convertNft(ps, 5, 1.0)
+      expect(updatedPlayerSim).toBe(ps)
+      expect(moneyDelta).toBe(0)
+    })
+
+    it('rejects on amount = 0', () => {
+      const ps = { ...createInitialPlayerSimState('s0'), nftWallet: 5 }
+      const { updatedPlayerSim, moneyDelta } = convertNft(ps, 0, 2.0)
+      expect(updatedPlayerSim).toBe(ps)
+      expect(moneyDelta).toBe(0)
+    })
+
+    it('rejects on negative amount', () => {
+      const ps = { ...createInitialPlayerSimState('s0'), nftWallet: 5 }
+      const { moneyDelta } = convertNft(ps, -3, 2.0)
+      expect(moneyDelta).toBe(0)
+    })
+
+    it('does not mutate input playerSim', () => {
+      const ps = { ...createInitialPlayerSimState('s0'), nftWallet: 5 }
+      const snapshot = JSON.parse(JSON.stringify(ps))
+      convertNft(ps, 2, 1.5)
+      expect(ps).toEqual(snapshot)
+    })
+  })
+
+  describe('purchaseNftWhitelist', () => {
+    it('debits whitelistCost and appends item on a hit', () => {
+      const ps = { ...createInitialPlayerSimState('s0'), nftWallet: 5 }
+      const def = NFT_ITEM_DEFINITIONS.rare
+      const item = {
+        id: 'nft-1',
+        rarity: 'rare' as const,
+        displayLabel: def.displayLabel,
+        displayMeta: def.displayMeta,
+        baseValue: def.baseValue,
+      }
+      const next = purchaseNftWhitelist(ps, item)
+      expect(next.nftWallet).toBe(5 - NFT_CONFIG.whitelistCost)
+      expect(next.heldNfts.length).toBe(1)
+      expect(next.heldNfts[0].id).toBe('nft-1')
+    })
+
+    it('debits whitelistCost without appending on a miss (item=null)', () => {
+      const ps = { ...createInitialPlayerSimState('s0'), nftWallet: 5 }
+      const next = purchaseNftWhitelist(ps, null)
+      expect(next.nftWallet).toBe(5 - NFT_CONFIG.whitelistCost)
+      expect(next.heldNfts.length).toBe(0)
+    })
+
+    it('returns input unchanged when nftWallet < whitelistCost', () => {
+      const ps = { ...createInitialPlayerSimState('s0'), nftWallet: 1 }
+      const next = purchaseNftWhitelist(ps, null)
+      expect(next).toBe(ps)
+    })
+
+    it('does not mutate input playerSim', () => {
+      const ps = { ...createInitialPlayerSimState('s0'), nftWallet: 5 }
+      const snapshot = JSON.parse(JSON.stringify(ps))
+      purchaseNftWhitelist(ps, null)
+      expect(ps).toEqual(snapshot)
+    })
   })
 })

@@ -16,6 +16,7 @@ import type {
   Relationship,
   LandlordStage,
   DrugItemKind,
+  NftRarity,
 } from '../types/game'
 
 export const SIM_CONFIG = {
@@ -262,6 +263,56 @@ export const DRUG_DEFINITIONS: Record<DrugItemKind, {
   pills:    { displayLabel: 'Lozenges (Series II)',   displayMeta: 'edition of 100, 2024',  coolness: 5,  restedness:  -8 },
 }
 
+// ─── Phase 5 Plan 01: NFT parallel economy ─────────────────────────────────
+
+/**
+ * Tunables for the NFT parallel economy.
+ *
+ *  - unlockThreshold: when a player's Coolness crosses this value during
+ *    advanceFromSimDay, nftWalletUnlocked flips to true and an NFT_DM is
+ *    dispatched to that connection.
+ *  - initialWallet: starting nftWallet balance for every player. Visible
+ *    only after the unlock fires.
+ *  - whitelistCost: NFT-currency price of a single PURCHASE_NFT_WHITELIST.
+ *  - hypeDriftRange: max absolute random delta applied to nftHypeCycle each
+ *    sim_day (server-side Math.random; engine receives the projected value).
+ *  - sculptorReactionDelta / socialPoliticalReactionDelta: relationship
+ *    score deltas applied to ALL faction-aligned characters per NFT action.
+ *  - dmCopy: the unlock notification text rendered in WallLabel register.
+ *  - denouncementCopyTemplate: tweet-style block produced when a Social/
+ *    Political relationship is hit; {name} is replaced with the player's
+ *    displayName at broadcast time.
+ */
+export const NFT_CONFIG = {
+  unlockThreshold: 60,
+  initialWallet: 5,
+  whitelistCost: 2,
+  hypeDriftRange: 10,
+  sculptorReactionDelta: -3,
+  socialPoliticalReactionDelta: -5,
+  dmCopy: "you've crossed the threshold. welcome to the chain. — anonymous",
+  denouncementCopyTemplate:
+    "{name} just minted. the museum shouldn't be a server farm.",
+} as const
+
+/**
+ * Per-rarity NFT metadata. displayLabel/displayMeta match the painting
+ * collection wall-label format — NftPanel renders them via AppraisalForm so
+ * the holdings list reads as a parody appraisal sheet. baseValue is a flat
+ * NFT-currency anchor; the actual conversion rate is driven by
+ * computeNftExchangeRate(sim.nftHypeCycle).
+ */
+export const NFT_ITEM_DEFINITIONS: Record<NftRarity, {
+  displayLabel: string
+  displayMeta: string
+  baseValue: number
+}> = {
+  common:    { displayLabel: 'Untitled (PFP #4421)',    displayMeta: 'edition of 10000, 2024',  baseValue:  1 },
+  uncommon:  { displayLabel: 'Avatar (Series III)',     displayMeta: 'edition of 1000, 2024',   baseValue:  4 },
+  rare:      { displayLabel: 'Untitled (Glass)',        displayMeta: 'edition of 100, 2024',    baseValue: 10 },
+  legendary: { displayLabel: 'Crown (1/1)',             displayMeta: 'on-chain generative, 2024', baseValue: 25 },
+}
+
 // Dev-mode transaction log. Production builds drop this entirely via the
 // import.meta.env.DEV branch elimination Vite performs at build time.
 export function logSimTransaction(event: SimEvent, sessionId: string): void {
@@ -288,6 +339,12 @@ export function createInitialPlayerSimState(sessionId: string): PlayerSimState {
     // Phase 4 Plan 03: drug inventory + risk stat both start empty/0.
     drugs: [],
     risk: 0,
+    // Phase 5 Plan 01: NFT parallel economy. nftWallet starts at the config
+    // initialWallet but is invisible until nftWalletUnlocked flips true after
+    // a Coolness threshold cross inside advanceFromSimDay.
+    nftWallet: NFT_CONFIG.initialWallet,
+    nftWalletUnlocked: false,
+    heldNfts: [],
     droppedArtist: null,
     // Phase 4 Plan 02: landlord arc starts at stage 1 with stage 1 already in
     // the seen list so the first bubble is visible immediately on day 1.

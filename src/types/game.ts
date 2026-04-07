@@ -181,6 +181,46 @@ export interface TimeSlot {
   targetCharacterId?: string
 }
 
+// ─── Phase 5 Plan 01: NFT parallel economy ─────────────────────────────────
+
+/**
+ * NFT rarity tiers. Each rarity maps to a NFT_ITEM_DEFINITIONS entry in
+ * sim-config supplying wall-label display strings (no marketing copy) and a
+ * baseValue used by NftPanel for the holdings rows.
+ */
+export type NftRarity = 'common' | 'uncommon' | 'rare' | 'legendary'
+
+/**
+ * An item in a player's NFT holdings array. id is server-generated
+ * (crypto.randomUUID in party/server.ts) so the pure engine stays
+ * entropy-free, mirroring the DrugItem pattern.
+ */
+export interface NftItem {
+  id: string
+  rarity: NftRarity
+  displayLabel: string
+  displayMeta: string
+  baseValue: number
+}
+
+/**
+ * Outbound NFT messages. NFT_DM is unicast to the connection whose Coolness
+ * crossed the unlock threshold. NFT_DENOUNCEMENT is broadcast to the room
+ * whenever a PURCHASE_NFT_WHITELIST hits at least one Social/Political
+ * relationship — the public denouncement is the whole point.
+ */
+export interface NftDmMessage {
+  type: 'NFT_DM'
+  copy: string
+}
+
+export interface NftDenouncementMessage {
+  type: 'NFT_DENOUNCEMENT'
+  sessionId: string
+  displayName: string
+  copy: string
+}
+
 // ─── Phase 4 Plan 03: Drug system ──────────────────────────────────────────
 
 /**
@@ -263,6 +303,15 @@ export interface PlayerSimState {
   // and decays by 1 per sim_day when the inventory is empty.
   drugs: DrugItem[]
   risk: number
+  // Phase 5 Plan 01: NFT parallel economy. nftWallet is a separate integer
+  // ledger from player.money — converting requires an explicit CONVERT_NFT
+  // message. nftWalletUnlocked flips true exactly once when Coolness crosses
+  // NFT_CONFIG.unlockThreshold inside advanceFromSimDay (server-only writer,
+  // T-5-05). heldNfts accumulates server-side NftItems from successful
+  // PURCHASE_NFT_WHITELIST rolls.
+  nftWallet: number
+  nftWalletUnlocked: boolean
+  heldNfts: NftItem[]
   // Phase 4 Plan 01: the `droppedArtist` is the Artist the player "shouldn't
   // have dropped" — server-seeded at game start via seedDroppedArtist().
   // The canonical source of truth is the corresponding Relationship with

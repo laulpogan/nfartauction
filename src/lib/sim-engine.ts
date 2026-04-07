@@ -30,6 +30,7 @@ import type {
   DrugItem,
   DrugItemKind,
   PlayerStats,
+  NftItem,
 } from '../types/game'
 import {
   SLOT_DEFINITIONS,
@@ -38,6 +39,8 @@ import {
   LANDLORD_CONFIG,
   DRUG_CONFIG,
   DRUG_DEFINITIONS,
+  NFT_CONFIG,
+  NFT_ITEM_DEFINITIONS,
 } from './sim-config'
 
 export interface ResolveSlotsResult {
@@ -511,6 +514,81 @@ export function accumulateRisk(playerSim: PlayerSimState): PlayerSimState {
   return playerSim
 }
 
+// ─── Phase 5 Plan 01: NFT system pure functions ──────────────────────────
+
+export interface ConvertNftResult {
+  updatedPlayerSim: PlayerSimState
+  /** Money to credit onto player.money. Zero on a rejected call. */
+  moneyDelta: number
+}
+
+/**
+ * Convert nftWallet currency to player money at the given exchange rate.
+ *
+ * Pure: returns a new PlayerSimState; never mutates the input. Rejects with
+ * the input unchanged + moneyDelta = 0 when amount <= 0 OR amount exceeds
+ * the current nftWallet balance. T-5-01 mitigation: the engine performs the
+ * overdraft check independently of the Zod boundary at the server.
+ */
+export function convertNft(
+  playerSim: PlayerSimState,
+  amount: number,
+  exchangeRate: number,
+): ConvertNftResult {
+  if (amount <= 0) return { updatedPlayerSim: playerSim, moneyDelta: 0 }
+  if (amount > playerSim.nftWallet) {
+    return { updatedPlayerSim: playerSim, moneyDelta: 0 }
+  }
+  const moneyDelta = Math.floor(amount * exchangeRate)
+  return {
+    updatedPlayerSim: { ...playerSim, nftWallet: playerSim.nftWallet - amount },
+    moneyDelta,
+  }
+}
+
+/**
+ * Apply a whitelist purchase: debit NFT_CONFIG.whitelistCost from nftWallet
+ * and (optionally) append the supplied NftItem to heldNfts. The item id is
+ * provided by the caller (server-side entropy boundary, mirrors addDrugItem).
+ *
+ * Passing item=null still debits the cost — the server represents a "miss"
+ * on the random roll by calling with null, so the player still pays.
+ *
+ * Pure: never mutates the input. Returns the input unchanged when nftWallet
+ * is below the whitelist cost (defense in depth on top of the server gate).
+ */
+export function purchaseNftWhitelist(
+  playerSim: PlayerSimState,
+  item: NftItem | null,
+): PlayerSimState {
+  if (playerSim.nftWallet < NFT_CONFIG.whitelistCost) return playerSim
+  const nextWallet = playerSim.nftWallet - NFT_CONFIG.whitelistCost
+  const heldNfts = item ? [...playerSim.heldNfts, item] : playerSim.heldNfts
+  return { ...playerSim, nftWallet: nextWallet, heldNfts }
+}
+
+/**
+ * Project the next nftHypeCycle value given a caller-supplied random delta.
+ * Clamped to [0, 100]. Pure: the random source lives in the server, this
+ * function only does the clamped addition so tests can pass exact deltas.
+ */
+export function applyNftHypeDrift(
+  currentHype: number,
+  randomDelta: number,
+): number {
+  return clamp(currentHype + randomDelta, 0, 100)
+}
+
+/**
+ * Derive the NFT-currency → money exchange rate from the nftHypeCycle.
+ * Linear projection: 0 → 0.5, 50 → 1.25, 100 → 2.0. Pure projection — the
+ * server reads sim.nftHypeCycle and passes it in. NftPanel reads it the
+ * same way for the RATE row.
+ */
+export function computeNftExchangeRate(nftHypeCycle: number): number {
+  return 0.5 + (nftHypeCycle / 100) * 1.5
+}
+
 export interface AuctionModifiers {
   bidCeilingMultiplier: number
   luckRoll: number
@@ -552,6 +630,8 @@ export {
   LANDLORD_MESSAGES,
   DRUG_CONFIG,
   DRUG_DEFINITIONS,
+  NFT_CONFIG,
+  NFT_ITEM_DEFINITIONS,
 } from './sim-config'
 
 function clamp(n: number, lo: number, hi: number): number {
