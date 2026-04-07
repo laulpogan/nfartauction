@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { v4 as uuid } from 'uuid'
 import PartySocket from 'partysocket'
-import type { GameState, Card, RoundResult, PlayerSimState, TimeSlot } from '../types/game'
+import type { GameState, Card, RoundResult, PlayerSimState, TimeSlot, FinalAppraisal } from '../types/game'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -24,6 +24,7 @@ export function useGame(roomCode: string | null, playerName: string | null) {
   const [hand, setHand] = useState<Card[]>([])
   const [playerSim, setPlayerSim] = useState<PlayerSimState | null>(null)
   const [roundEndResult, setRoundEndResult] = useState<RoundResult | null>(null)
+  const [finalAppraisals, setFinalAppraisals] = useState<Record<string, FinalAppraisal> | null>(null)
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const socketRef = useRef<PartySocket | null>(null)
@@ -51,6 +52,9 @@ export function useGame(roomCode: string | null, playerName: string | null) {
       if (msg.type === 'YOUR_HAND') setHand(msg.hand as Card[])
       if (msg.type === 'YOUR_SIM_STATE') setPlayerSim(msg.simState as PlayerSimState)
       if (msg.type === 'ROUND_END') setRoundEndResult(msg.result as RoundResult)
+      if (msg.type === 'GAME_OVER_APPRAISALS') {
+        setFinalAppraisals(msg.appraisals as Record<string, FinalAppraisal>)
+      }
       if (msg.type === 'ERROR') setError(msg.message as string)
     })
 
@@ -84,6 +88,7 @@ export function useGame(roomCode: string | null, playerName: string | null) {
     connected,
     error,
     roundEndResult,
+    finalAppraisals,
     sessionId,
     setRoundEndResult,
     actions: {

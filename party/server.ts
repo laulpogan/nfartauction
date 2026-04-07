@@ -4,6 +4,7 @@ import type {
   GameState, Card, Artist, RoundResult,
   PublicGameState, PublicAuctionState,
   GamePhase, SimState, PlayerSimState, TimeSlot,
+  Neighborhood, FinalAppraisal,
 } from '../src/types/game'
 import { ARTISTS } from '../src/types/game'
 import {
@@ -26,6 +27,7 @@ import {
   applyNftHypeDrift,
   computeNftExchangeRate,
   updateRelationship,
+  computeFinalAppraisal,
 } from '../src/lib/sim-engine'
 import {
   SIM_CONFIG,
@@ -118,6 +120,19 @@ interface ServerState {
   // storage API shape is confirmed.
   sim: SimState
   playerSim: Record<string, PlayerSimState>
+  // Phase 5 Plan 02: end-state appraisal support.
+  //
+  // neighborhoodHistory is a server-only append-only log of each player's
+  // currentNeighborhood at the END of every resolveSlots call (i.e., after
+  // the day's travel). Written only inside advanceFromSimDay — no inbound
+  // message can touch it (T-5-13). Fed into computeFinalAppraisal when the
+  // game transitions to game_over after the round-4 auction resolves.
+  //
+  // lastFinalAppraisals caches the per-session appraisals computed on the
+  // game_over transition so reconnecting players can replay the broadcast
+  // via onConnect (T-5-14).
+  neighborhoodHistory: Record<string, Neighborhood[]>
+  lastFinalAppraisals?: Record<string, FinalAppraisal>
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -218,6 +233,8 @@ export default class GameServer implements Party.Server {
       // Backfill sim-loop fields for any pre-Phase-3 persisted state.
       if (!this.state.sim) this.state.sim = createInitialSimState()
       if (!this.state.playerSim) this.state.playerSim = {}
+      // Phase 5 Plan 02: backfill neighborhoodHistory for pre-05-02 states.
+      if (!this.state.neighborhoodHistory) this.state.neighborhoodHistory = {}
       // Also backfill game.phase and game.sim for old saved games that
       // predate the Phase 3 types extension.
       if (!this.state.game.phase) {
@@ -248,6 +265,16 @@ export default class GameServer implements Party.Server {
     // ENG-09: replay last round summary if a round resolved while we were gone
     if (this.state.lastRoundResult && this.state.game.status === 'playing') {
       conn.send(JSON.stringify({ type: 'ROUND_END', result: this.state.lastRoundResult }))
+    }
+    // Phase 5 Plan 02: replay final appraisals to reconnecting players once
+    // the game is in the game_over phase (T-5-14 mitigation).
+    if (this.state.lastFinalAppraisals && this.state.game.status === 'game_over') {
+      conn.send(
+        JSON.stringify({
+          type: 'GAME_OVER_APPRAISALS',
+          appraisals: this.state.lastFinalAppraisals,
+        }),
+      )
     }
   }
 
@@ -305,6 +332,7 @@ export default class GameServer implements Party.Server {
           sessions: { [sessionId]: session },
           sim: createInitialSimState(),
           playerSim: { [sessionId]: seedFreshPlayerSim(sessionId) },
+          neighborhoodHistory: { [sessionId]: [] },
         }
       } else {
         // Check if already in session (reconnect)
@@ -335,6 +363,7 @@ export default class GameServer implements Party.Server {
         this.state.sessions[sessionId] = session
         this.state.hands[sessionId] = []
         this.state.playerSim[sessionId] = seedFreshPlayerSim(sessionId)
+        this.state.neighborhoodHistory[sessionId] = []
         this.state.game = {
           ...this.state.game,
           players: [...this.state.game.players, sessionToPublicPlayer(session)],
@@ -422,12 +451,43 @@ export default class GameServer implements Party.Server {
         } else {
           this.clearSimDayTimeout()
         }
+        // Phase 5 Plan 02: when the engine's endRound flipped status to
+        // game_over (round 4 resolved), compute per-player FinalAppraisals
+        // from the server-tracked neighborhoodHistory + playerSim snapshot
+        // and broadcast them to the room. T-5-11 mitigation: this branch
+        // runs ONLY when finalGame.status === 'game_over', which the engine
+        // sets exclusively at the end of round 4. No inbound message can
+        // force this path.
+        let finalAppraisals: Record<string, FinalAppraisal> | null = null
+        if (finalGame.status === 'game_over') {
+          finalAppraisals = {}
+          for (const p of finalGame.players) {
+            const ps = this.state.playerSim[p.sessionId]
+            if (!ps) continue
+            finalAppraisals[p.sessionId] = computeFinalAppraisal({
+              sessionId: p.sessionId,
+              displayName: p.displayName,
+              finalMoney: p.money,
+              playerSim: ps,
+              neighborhoodHistory: this.state.neighborhoodHistory[p.sessionId] ?? [],
+            })
+          }
+          this.state.lastFinalAppraisals = finalAppraisals
+        }
         // ENG-09: persist last round result so reconnecting players can replay it
         this.state.lastRoundResult = result
         await this.persist()
         this.broadcastStateSecure()
         this.broadcastHands()
         this.room.broadcast(JSON.stringify({ type: 'ROUND_END', result }))
+        if (finalAppraisals) {
+          this.room.broadcast(
+            JSON.stringify({
+              type: 'GAME_OVER_APPRAISALS',
+              appraisals: finalAppraisals,
+            }),
+          )
+        }
       } else {
         this.state.game = updatedGame
         await this.persist()
@@ -910,6 +970,14 @@ export default class GameServer implements Party.Server {
         )
         updatedPlayerSimMap[p.sessionId] = { ...updatedPlayerSim, scheduledSlots: [] }
         contactedByPlayer.set(p.sessionId, contactedThisDay)
+        // Phase 5 Plan 02: append the post-travel neighborhood to the
+        // server-only history log. This is the input to computeFinalAppraisal
+        // at game_over (T-5-13 — written only here, no inbound surface).
+        const history = this.state!.neighborhoodHistory[p.sessionId] ?? []
+        this.state!.neighborhoodHistory[p.sessionId] = [
+          ...history,
+          updatedPlayerSim.currentNeighborhood,
+        ]
         // Mirror coolness onto the public player projection so opponents see it.
         return {
           ...p,

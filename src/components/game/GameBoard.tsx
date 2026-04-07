@@ -1,4 +1,4 @@
-import type { GameState, Card, RoundResult } from '../../types/game'
+import type { GameState, Card, RoundResult, FinalAppraisal } from '../../types/game'
 import { ArtistTracker } from './ArtistTracker'
 import { PlayerList } from './PlayerList'
 import { AuctionPanel } from './AuctionPanel'
@@ -18,6 +18,7 @@ interface GameBoardProps {
   myMoney: number
   roundEndResult: RoundResult | null
   onDismissRoundEnd: () => void
+  finalAppraisals?: Record<string, FinalAppraisal> | null
   actions: {
     playCard: (card: Card) => void
     playSecondCard: (card: Card) => void
@@ -33,7 +34,7 @@ interface GameBoardProps {
 
 export function GameBoard({
   game, hand, myPlayerIdx, isMyTurn, isAuctioneer, myMoney,
-  roundEndResult, onDismissRoundEnd, actions,
+  roundEndResult, onDismissRoundEnd, finalAppraisals = null, actions,
 }: GameBoardProps) {
   const navigate = useNavigate()
 
@@ -134,7 +135,12 @@ export function GameBoard({
           <RoundEndModal result={roundEndResult} game={game} onDismiss={onDismissRoundEnd} />
         )}
         {game.status === 'game_over' && (
-          <GameOverModal game={game} myPlayerIdx={myPlayerIdx} onPlayAgain={() => navigate('/')} />
+          <GameOverModal
+            game={game}
+            appraisals={finalAppraisals}
+            myPlayerIdx={myPlayerIdx}
+            onPlayAgain={() => navigate('/')}
+          />
         )}
       </div>
     </NeighborhoodProvider>

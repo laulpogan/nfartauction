@@ -13,7 +13,7 @@ export function GamePage() {
 
   const {
     game, hand, myPlayerIdx, isMyTurn, isAuctioneer, myMoney, playerSim,
-    roundEndResult, setRoundEndResult, connected, error, sessionId, actions,
+    roundEndResult, setRoundEndResult, finalAppraisals, connected, error, sessionId, actions,
   } = useGame(code ?? null, playerName)
 
   if (!connected && !game) {
@@ -71,6 +71,7 @@ export function GamePage() {
         myMoney={myMoney}
         roundEndResult={roundEndResult}
         onDismissRoundEnd={() => setRoundEndResult(null)}
+        finalAppraisals={finalAppraisals}
         actions={actions}
       />
     )
@@ -110,6 +111,7 @@ export function GamePage() {
           myMoney={myMoney}
           roundEndResult={roundEndResult}
           onDismissRoundEnd={() => setRoundEndResult(null)}
+          finalAppraisals={finalAppraisals}
           actions={actions}
         />
       )
