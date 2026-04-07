@@ -77,6 +77,24 @@ function syncSessions(state: ServerState): ServerState {
   return updated
 }
 
+// ─── Public-state projection (ENG-01, ENG-02) ────────────────────────────────
+//
+// Strips the deck (server-only) and replaces sealed-bid amounts with a
+// presence-only marker, so no client receives information they should not
+// have. Applied per-connection in broadcastStateSecure().
+function derivePublicState(game: GameState): PublicGameState {
+  const { deck: _deck, auction, ...rest } = game
+  let publicAuction: PublicAuctionState | null = null
+  if (auction) {
+    const sealedBidsPresence: Record<number, true> = {}
+    for (const idx of Object.keys(auction.sealedBids)) {
+      sealedBidsPresence[Number(idx)] = true
+    }
+    publicAuction = { ...auction, sealedBids: sealedBidsPresence }
+  }
+  return { ...rest, deck: [] as never[], auction: publicAuction }
+}
+
 // ─── PartyKit Server ──────────────────────────────────────────────────────────
 
 export default class GameServer implements Party.Server {
@@ -90,11 +108,15 @@ export default class GameServer implements Party.Server {
 
   async onConnect(conn: Party.Connection) {
     if (!this.state) return
-    // Send current public state
-    conn.send(JSON.stringify({ type: 'GAME_STATE', game: this.state.game }))
+    // Send public projection of game state (deck stripped, sealed bids hidden)
+    conn.send(JSON.stringify({ type: 'GAME_STATE', game: derivePublicState(this.state.game) }))
     // Send private hand
     const hand = this.state.hands[conn.id] ?? []
     conn.send(JSON.stringify({ type: 'YOUR_HAND', hand }))
+    // ENG-09: replay last round summary if a round resolved while we were gone
+    if (this.state.lastRoundResult && this.state.game.status === 'playing') {
+      conn.send(JSON.stringify({ type: 'ROUND_END', result: this.state.lastRoundResult }))
+    }
   }
 
   async onMessage(message: string, sender: Party.Connection) {
@@ -112,7 +134,7 @@ export default class GameServer implements Party.Server {
     // ── JOIN ────────────────────────────────────────────────────────────────
     if (msg.type === 'JOIN') {
       const name = msg.name as string
-      const isHost = msg.isHost as boolean
+      // ENG-04: host status is server-assigned by connection order; never read isHost from the client message.
 
       if (!this.state) {
         // First player creates game
@@ -142,8 +164,11 @@ export default class GameServer implements Party.Server {
       } else {
         // Check if already in session (reconnect)
         if (this.state.sessions[sessionId]) {
-          sender.send(JSON.stringify({ type: 'GAME_STATE', game: this.state.game }))
+          sender.send(JSON.stringify({ type: 'GAME_STATE', game: derivePublicState(this.state.game) }))
           sender.send(JSON.stringify({ type: 'YOUR_HAND', hand: this.state.hands[sessionId] ?? [] }))
+          if (this.state.lastRoundResult && this.state.game.status === 'playing') {
+            sender.send(JSON.stringify({ type: 'ROUND_END', result: this.state.lastRoundResult }))
+          }
           return
         }
         // New player joining lobby
@@ -166,7 +191,7 @@ export default class GameServer implements Party.Server {
       }
 
       await this.persist()
-      this.broadcastState()
+      this.broadcastStateSecure()
       return
     }
 
@@ -211,7 +236,7 @@ export default class GameServer implements Party.Server {
       }
 
       await this.persist()
-      this.broadcastState()
+      this.broadcastStateSecure()
       this.broadcastHands()
       return
     }
@@ -240,22 +265,34 @@ export default class GameServer implements Party.Server {
         })
 
         this.state.game = finalGame
+        // ENG-09: persist last round result so reconnecting players can replay it
+        this.state.lastRoundResult = result
         await this.persist()
-        this.broadcastState()
+        this.broadcastStateSecure()
         this.broadcastHands()
         this.room.broadcast(JSON.stringify({ type: 'ROUND_END', result }))
       } else {
         this.state.game = updatedGame
         await this.persist()
-        this.broadcastState()
+        this.broadcastStateSecure()
         sender.send(JSON.stringify({ type: 'YOUR_HAND', hand: updatedPlayer.hand }))
       }
       return
     }
 
     // ── PLAY_SECOND_CARD ────────────────────────────────────────────────────
+    // ENG-03: faithful Knizia rule — only the player whose clockwise turn it
+    // is to play/pass the second card may play it. They become the new
+    // auctioneer for this lot.
     if (msg.type === 'PLAY_SECOND_CARD') {
       if (!this.state) return
+      const session = this.state.sessions[sessionId]
+      if (!session) return
+      const auction = this.state.game.auction
+      if (!auction || auction.status !== 'waiting_second' || auction.waitingSecondCardIdx !== session.position) {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'Not your turn to play the second card' }))
+        return
+      }
       const card = msg.card as Card
       const playerRecord = this.getPlayerRecord(sessionId)
       if (!playerRecord) return
@@ -265,8 +302,31 @@ export default class GameServer implements Party.Server {
       this.state.hands[sessionId] = updatedPlayer.hand
 
       await this.persist()
-      this.broadcastState()
+      this.broadcastStateSecure()
       sender.send(JSON.stringify({ type: 'YOUR_HAND', hand: updatedPlayer.hand }))
+      return
+    }
+
+    // ── PASS_SECOND_CARD ────────────────────────────────────────────────────
+    // ENG-03: clockwise pass mechanic. If every player passes back to the
+    // original auctioneer, they take the single card for free and no auction
+    // is held.
+    if (msg.type === 'PASS_SECOND_CARD') {
+      if (!this.state) return
+      const session = this.state.sessions[sessionId]
+      if (!session) return
+      const auction = this.state.game.auction
+      if (!auction || auction.status !== 'waiting_second' || auction.waitingSecondCardIdx !== session.position) {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'Not your turn to pass' }))
+        return
+      }
+      const { updatedGame, auctioneerTakesFree } = passSecondCard(this.state.game, session.position)
+      this.state.game = updatedGame
+      await this.persist()
+      this.broadcastStateSecure()
+      if (auctioneerTakesFree) {
+        this.room.broadcast(JSON.stringify({ type: 'DOUBLE_AUCTION_ABANDONED' }))
+      }
       return
     }
 
@@ -275,7 +335,7 @@ export default class GameServer implements Party.Server {
       if (!this.state) return
       this.state.game = setFixedPrice(this.state.game, msg.price as number)
       await this.persist()
-      this.broadcastState()
+      this.broadcastStateSecure()
       return
     }
 
@@ -288,7 +348,7 @@ export default class GameServer implements Party.Server {
       const { updatedGame, updatedPlayers } = acceptFixedPrice(this.state.game, allRecords, session.position)
       this.applyPlayerUpdates(updatedGame, updatedPlayers)
       await this.persist()
-      this.broadcastState()
+      this.broadcastStateSecure()
       return
     }
 
@@ -306,7 +366,7 @@ export default class GameServer implements Party.Server {
         this.state.game = updatedGame
       }
       await this.persist()
-      this.broadcastState()
+      this.broadcastStateSecure()
       return
     }
 
@@ -317,7 +377,7 @@ export default class GameServer implements Party.Server {
       if (!session) return
       this.state.game = placeOpenBid(this.state.game, session.position, msg.amount as number)
       await this.persist()
-      this.broadcastState()
+      this.broadcastStateSecure()
       return
     }
 
@@ -328,7 +388,7 @@ export default class GameServer implements Party.Server {
       const { updatedGame, updatedPlayers } = endOpenAuction(this.state.game, allRecords)
       this.applyPlayerUpdates(updatedGame, updatedPlayers)
       await this.persist()
-      this.broadcastState()
+      this.broadcastStateSecure()
       return
     }
 
@@ -345,7 +405,7 @@ export default class GameServer implements Party.Server {
         this.state.game = result.updatedGame
       }
       await this.persist()
-      this.broadcastState()
+      this.broadcastStateSecure()
       return
     }
 
@@ -362,7 +422,7 @@ export default class GameServer implements Party.Server {
         this.state.game = result.updatedGame
       }
       await this.persist()
-      this.broadcastState()
+      this.broadcastStateSecure()
       return
     }
   }
@@ -395,9 +455,13 @@ export default class GameServer implements Party.Server {
     this.state.game = updatedGame
   }
 
-  private broadcastState() {
+  private broadcastStateSecure() {
     if (!this.state) return
-    this.room.broadcast(JSON.stringify({ type: 'GAME_STATE', game: this.state.game }))
+    const publicGame = derivePublicState(this.state.game)
+    const payload = JSON.stringify({ type: 'GAME_STATE', game: publicGame })
+    for (const conn of this.room.getConnections()) {
+      conn.send(payload)
+    }
   }
 
   private broadcastHands() {
