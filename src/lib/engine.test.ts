@@ -144,6 +144,23 @@ describe('open auction', () => {
     expect(updatedPlayers[0].money).toBe(100000)
     expect(updatedPlayers[0].paintings).toHaveLength(1)
   })
+
+  it('advances currentPlayerIdx after resolution so the next player can play', () => {
+    const { game, players } = beginAuction(3, 'open')
+    expect(game.currentPlayerIdx).toBe(0) // player 0 started the auction
+    const afterBid = placeOpenBid(game, 1, 5000)
+    const { updatedGame } = endOpenAuction(afterBid, players)
+    expect(updatedGame.currentPlayerIdx).toBe(1) // advanced to player 1
+    expect(updatedGame.auction?.status).toBe('completed')
+    // After server clears auction to null, player 1 can play.
+    // (Auction clearing is a server responsibility, not engine.)
+    const gameCleared = { ...updatedGame, auction: null }
+    const c = card('krypto', 'open')
+    players[1].hand = [c]
+    const nextResult = playCard(gameCleared, players[1], c)
+    expect(nextResult.updatedGame.auction).not.toBeNull()
+    expect(nextResult.updatedGame.auction?.auctioneerIdx).toBe(1)
+  })
 })
 
 // ─── Once-around auction ─────────────────────────────────────────────────────

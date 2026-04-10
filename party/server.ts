@@ -869,20 +869,22 @@ export default class GameServer implements Party.Server {
         this.state!.sessions[p.sessionId] = { ...sess, money: p.money, paintings: p.paintings }
       }
     })
-    this.state.game = updatedGame
+    // Clear the completed auction so the next player can play a card.
+    // The engine sets auction.status = 'completed' on resolve but leaves the
+    // object in place; clearing it to null is the server's responsibility.
+    this.state.game = { ...updatedGame, auction: null }
   }
 
   private broadcastStateSecure() {
     if (!this.state) return
     const publicGame = derivePublicState(this.state.game)
-    const payload = JSON.stringify({ type: 'GAME_STATE', game: publicGame })
-    for (const conn of this.room.getConnections()) {
-      conn.send(payload)
-    }
+    // Use room.broadcast for hibernation-safe delivery on Cloudflare DO.
+    this.room.broadcast(JSON.stringify({ type: 'GAME_STATE', game: publicGame }))
   }
 
   private broadcastHands() {
     if (!this.state) return
+    // Hands are per-connection (private), so we must iterate.
     for (const conn of this.room.getConnections()) {
       const hand = this.state.hands[conn.id] ?? []
       conn.send(JSON.stringify({ type: 'YOUR_HAND', hand }))

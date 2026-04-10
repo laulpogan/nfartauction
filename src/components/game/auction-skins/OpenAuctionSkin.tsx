@@ -16,7 +16,7 @@ import { formatMoney } from './types'
  * auctioneer. No emoji.
  */
 export function OpenAuctionSkin(props: AuctionSkinProps) {
-  const { game, myPlayerIdx, isAuctioneer, myMoney, onPlaceOpenBid, onEndOpenAuction } = props
+  const { game, isAuctioneer, myMoney, onPlaceOpenBid, onEndOpenAuction } = props
   const auction = game.auction!
   const auctioneer = game.players[auction.auctioneerIdx]
   const [bidAmount, setBidAmount] = useState('')
@@ -107,8 +107,7 @@ export function OpenAuctionSkin(props: AuctionSkinProps) {
               disabled={
                 !bidAmount ||
                 parseInt(bidAmount) <= auction.currentBid ||
-                parseInt(bidAmount) > myMoney ||
-                myPlayerIdx === auction.auctioneerIdx
+                parseInt(bidAmount) > myMoney
               }
             >
               PLACE BID
