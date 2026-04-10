@@ -81,10 +81,10 @@
 ### Bot Players
 
 - [ ] **BOT-01**: Host can configure 0-3 bot players in the lobby before starting the game
-- [ ] **BOT-02**: Bot players have distinct names and personality profiles (conservative, aggressive, erratic)
-- [ ] **BOT-03**: Bots play cards on their turn, selecting from their hand based on artist valuation strategy
-- [ ] **BOT-04**: Bots place bids in all 5 auction types, responding to market hotness, current artist value, and their own money
-- [ ] **BOT-05**: Bots submit sim day time slots with strategies weighted by their personality profile
+- [x] **BOT-02**: Bot players have distinct names and personality profiles (conservative, aggressive, erratic)
+- [x] **BOT-03**: Bots play cards on their turn, selecting from their hand based on artist valuation strategy
+- [x] **BOT-04**: Bots place bids in all 5 auction types, responding to market hotness, current artist value, and their own money
+- [x] **BOT-05**: Bots submit sim day time slots with strategies weighted by their personality profile
 - [ ] **BOT-06**: Bot actions execute server-side with no client code — bots are virtual connections managed by the server
 
 ## v2 Requirements

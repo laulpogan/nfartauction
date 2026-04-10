@@ -152,6 +152,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 **Plans:** 3 plans
 
 Plans:
-- [ ] 07-01-PLAN.md — Bot engine + types: BotPersonality type, bot-config.ts personalities/names, bot-engine.ts pure decision functions (chooseBotCard, chooseBotBid, chooseBotSlots), tests (BOT-02, BOT-03, BOT-04, BOT-05)
+- [x] 07-01-PLAN.md — Bot engine + types: BotPersonality type, bot-config.ts personalities/names, bot-engine.ts pure decision functions (chooseBotCard, chooseBotBid, chooseBotSlots), tests (BOT-02, BOT-03, BOT-04, BOT-05)
 - [ ] 07-02-PLAN.md — Server bot integration: SET_BOT_COUNT handler, bot session creation at START_GAME, bot turn executor, bot sim day auto-submit (BOT-01, BOT-06)
 - [ ] 07-03-PLAN.md — Lobby UI: bot count selector for host, bot player display with "Bot" chip (BOT-01)
