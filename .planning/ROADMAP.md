@@ -51,7 +51,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [x] 02-01-PLAN.md — Wave 0 atomic palette swap: @theme tokens, NeighborhoodContext, jsdom test infra, dark→white rewrite of all 5 game components (AEST-01, AEST-02)
+- [x] 02-01-PLAN.md — Wave 0 atomic palette swap: @theme tokens, NeighborhoodContext, jsdom test infra, dark->white rewrite of all 5 game components (AEST-01, AEST-02)
 - [x] 02-02-PLAN.md — Three aesthetic primitives (WallLabel, Receipt, AppraisalForm) + replace round-end + game-over modals with Receipt + thread WallLabel into GameBoard header (AEST-03, AEST-04, AEST-05)
 - [x] 02-03-PLAN.md — Five auction visual skins dispatched from AuctionPanel + OnlineNeighborhood broken-font wrapper (AEST-06 through AEST-11)
 **UI hint**: yes
@@ -126,7 +126,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -136,6 +136,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 4. Sim Depth — Relationships, Landlord, Drugs | 0/4 | Not started | - |
 | 5. NFT Layer & End State | 0/3 | Not started | - |
 | 6. Deployment & Polish | 1/1 | Complete | 2026-04-06 |
+| 7. Bot Players | 0/3 | Not started | - |
 
 ### Phase 7: Bot Players
 
@@ -148,4 +149,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
   3. A solo human player can complete a full 4-round game against 1-3 bots
   4. Bot bidding varies by personality profile and responds to current artist valuations and market hotness
   5. All bot logic runs server-side — no bot code in the client bundle
-**Plans:** TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — Bot engine + types: BotPersonality type, bot-config.ts personalities/names, bot-engine.ts pure decision functions (chooseBotCard, chooseBotBid, chooseBotSlots), tests (BOT-02, BOT-03, BOT-04, BOT-05)
+- [ ] 07-02-PLAN.md — Server bot integration: SET_BOT_COUNT handler, bot session creation at START_GAME, bot turn executor, bot sim day auto-submit (BOT-01, BOT-06)
+- [ ] 07-03-PLAN.md — Lobby UI: bot count selector for host, bot player display with "Bot" chip (BOT-01)
