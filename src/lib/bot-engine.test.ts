@@ -170,14 +170,20 @@ describe('chooseBotBid', () => {
       const auctionOA = makeAuction({ auctionType: 'once_around', currentBid: 0 })
       const auctionSB = makeAuction({ auctionType: 'sealed_bid', currentBid: 0 })
       const game = makeGameState()
-      // Use extreme random values to expose variance difference
-      const bidOA_low = chooseBotBid(auctionOA, game, 'erratic', 100000, 0.01)
-      const bidOA_high = chooseBotBid(auctionOA, game, 'erratic', 100000, 0.99)
-      const bidSB_low = chooseBotBid(auctionSB, game, 'erratic', 100000, 0.01)
-      const bidSB_high = chooseBotBid(auctionSB, game, 'erratic', 100000, 0.99)
-      // Sealed bid should have wider spread
-      const oaRange = Math.abs((bidOA_high ?? 0) - (bidOA_low ?? 0))
-      const sbRange = Math.abs((bidSB_high ?? 0) - (bidSB_low ?? 0))
+      // Use moderate random values that stay within pass threshold
+      // random=0.3 and random=0.7 produce bids that don't exceed passThreshold
+      const bidOA_low = chooseBotBid(auctionOA, game, 'conservative', 200000, 0.3)
+      const bidOA_high = chooseBotBid(auctionOA, game, 'conservative', 200000, 0.7)
+      const bidSB_low = chooseBotBid(auctionSB, game, 'conservative', 200000, 0.3)
+      const bidSB_high = chooseBotBid(auctionSB, game, 'conservative', 200000, 0.7)
+      // All should be non-null at these moderate values
+      expect(bidOA_low).not.toBeNull()
+      expect(bidOA_high).not.toBeNull()
+      expect(bidSB_low).not.toBeNull()
+      expect(bidSB_high).not.toBeNull()
+      // Sealed bid should have wider spread due to doubled noise
+      const oaRange = Math.abs(bidOA_high! - bidOA_low!)
+      const sbRange = Math.abs(bidSB_high! - bidSB_low!)
       expect(sbRange).toBeGreaterThanOrEqual(oaRange)
     })
   })
