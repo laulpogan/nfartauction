@@ -103,6 +103,7 @@ export function useGame(roomCode: string | null, playerName: string | null) {
       placeOnceAroundBid: (amount: number | null) => send({ type: 'PLACE_ONCE_AROUND_BID', amount }),
       submitSealedBid:    (amount: number) => send({ type: 'SUBMIT_SEALED_BID', amount }),
       submitSlots:        (slots: TimeSlot[]) => send({ type: 'SUBMIT_SLOTS', slots }),
+      setBotCount:        (count: number) => send({ type: 'SET_BOT_COUNT', count }),
       convertNft:         (amount: number) => send({ type: 'CONVERT_NFT', amount }),
       purchaseNftWhitelist: () => send({ type: 'PURCHASE_NFT_WHITELIST' }),
     },

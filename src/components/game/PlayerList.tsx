@@ -52,6 +52,9 @@ export function PlayerList({ game, myPlayerIdx }: PlayerListProps) {
                   {player.isHost && (
                     <span className="text-[9px] border border-ink text-ink px-1 rounded uppercase tracking-[0.18em]">Host</span>
                   )}
+                  {player.sessionId.startsWith('bot-') && (
+                    <span className="text-[9px] border border-rule text-ink-soft px-1 rounded uppercase tracking-[0.18em]">Bot</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-xs text-ink-soft">
