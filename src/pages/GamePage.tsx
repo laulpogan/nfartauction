@@ -58,6 +58,7 @@ export function GamePage() {
           game={game}
           isHost={isHost}
           onStartGame={actions.startGame}
+          onSetBotCount={actions.setBotCount}
         />
       )
     }
@@ -85,6 +86,7 @@ export function GamePage() {
           game={game}
           isHost={isHost}
           onStartGame={actions.startGame}
+          onSetBotCount={actions.setBotCount}
         />
       )
     }
