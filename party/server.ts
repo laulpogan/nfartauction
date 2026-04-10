@@ -4,7 +4,7 @@ import type {
   GameState, Card, Artist, RoundResult,
   PublicGameState, PublicAuctionState,
   GamePhase, SimState, PlayerSimState, TimeSlot,
-  Neighborhood, FinalAppraisal,
+  Neighborhood, FinalAppraisal, BotPersonality,
 } from '../src/types/game'
 import { ARTISTS } from '../src/types/game'
 import {
@@ -40,6 +40,8 @@ import {
 } from '../src/lib/sim-config'
 import type { DrugItemKind, NftRarity, NftItem } from '../src/types/game'
 import type { PlayerRecord } from '../src/types/game'
+import { chooseBotCard, chooseBotBid, chooseBotSecondCard, chooseBotSlots } from '../src/lib/bot-engine'
+import { BOT_NAMES, BOT_CONFIG } from '../src/lib/bot-config'
 
 // ─── Inbound message schema (ENG-05) ──────────────────────────────────────────
 
@@ -67,6 +69,7 @@ const TimeSlotSchema = z.object({
 
 const InboundMessage = z.discriminatedUnion('type', [
   z.object({ type: z.literal('JOIN'), name: z.string().min(1).max(30).regex(/^[\x20-\x7E]+$/), isHost: z.boolean().optional() }),
+  z.object({ type: z.literal('SET_BOT_COUNT'), count: z.number().int().min(0).max(3) }),
   z.object({ type: z.literal('START_GAME') }),
   z.object({ type: z.literal('PLAY_CARD'), card: CardSchema }),
   z.object({ type: z.literal('PLAY_SECOND_CARD'), card: CardSchema }),
@@ -103,6 +106,8 @@ interface Session {
   position: number
   money: number
   paintings: { artist: Artist; round: number }[]
+  isBot?: boolean
+  botPersonality?: BotPersonality
 }
 
 interface ServerState {
@@ -133,6 +138,7 @@ interface ServerState {
   // via onConnect (T-5-14).
   neighborhoodHistory: Record<string, Neighborhood[]>
   lastFinalAppraisals?: Record<string, FinalAppraisal>
+  botCount: number
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -238,6 +244,8 @@ export default class GameServer implements Party.Server {
       if (!this.state.playerSim) this.state.playerSim = {}
       // Phase 5 Plan 02: backfill neighborhoodHistory for pre-05-02 states.
       if (!this.state.neighborhoodHistory) this.state.neighborhoodHistory = {}
+      // Phase 7: backfill botCount for pre-07 states.
+      if (this.state.botCount === undefined) this.state.botCount = 0
       // Also backfill game.phase and game.sim for old saved games that
       // predate the Phase 3 types extension.
       if (!this.state.game.phase) {
@@ -336,6 +344,7 @@ export default class GameServer implements Party.Server {
           sim: createInitialSimState(),
           playerSim: { [sessionId]: seedFreshPlayerSim(sessionId) },
           neighborhoodHistory: { [sessionId]: [] },
+          botCount: 0,
         }
       } else {
         // Check if already in session (reconnect)
@@ -378,11 +387,67 @@ export default class GameServer implements Party.Server {
       return
     }
 
+    // ── SET_BOT_COUNT (Phase 7) ────────────────────────────────────────────
+    // Host-only, lobby-only. Bots count toward the 2-5 player limit (T-7-03,
+    // T-7-06). Bot sessions are created at START_GAME, not here.
+    if (msg.type === 'SET_BOT_COUNT') {
+      if (!this.state) return
+      if (this.state.game.status !== 'lobby') {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'Can only set bots in lobby' }))
+        return
+      }
+      const session = this.state.sessions[sessionId]
+      if (!session?.isHost) {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'Only host can set bot count' }))
+        return
+      }
+      const humanCount = this.state.game.players.length
+      if (msg.count + humanCount > 5) {
+        sender.send(JSON.stringify({ type: 'ERROR', message: 'Total players (humans + bots) cannot exceed 5' }))
+        return
+      }
+      this.state.botCount = msg.count
+      await this.persist()
+      this.broadcastStateSecure()
+      return
+    }
+
     // ── START_GAME ──────────────────────────────────────────────────────────
     if (msg.type === 'START_GAME') {
       if (!this.state) return
       const session = this.state.sessions[sessionId]
       if (!session?.isHost) { sender.send(JSON.stringify({ type: 'ERROR', message: 'Only host can start' })); return }
+
+      // Phase 7: create bot sessions BEFORE player-count validation so bots
+      // count toward the 2-5 limit. Bot sessionIds use 'bot-N' prefix which
+      // no real WebSocket connection can claim (T-7-04).
+      const botPersonalities: BotPersonality[] = ['conservative', 'aggressive', 'erratic']
+      const humanCount = this.state.game.players.length
+      for (let i = 0; i < this.state.botCount; i++) {
+        const personality = botPersonalities[i % botPersonalities.length]
+        const botSessionId = `bot-${i}`
+        const botName = BOT_NAMES[personality][i % BOT_NAMES[personality].length]
+        const botPosition = humanCount + i
+        const botSession: Session = {
+          sessionId: botSessionId,
+          name: botName,
+          isHost: false,
+          position: botPosition,
+          money: 100000,
+          paintings: [],
+          isBot: true,
+          botPersonality: personality,
+        }
+        this.state.sessions[botSessionId] = botSession
+        this.state.hands[botSessionId] = []
+        this.state.playerSim[botSessionId] = seedFreshPlayerSim(botSessionId)
+        this.state.neighborhoodHistory[botSessionId] = []
+        this.state.game = {
+          ...this.state.game,
+          players: [...this.state.game.players, sessionToPublicPlayer(botSession)],
+        }
+      }
+
       if (this.state.game.players.length < 2) { sender.send(JSON.stringify({ type: 'ERROR', message: 'Need at least 2 players' })); return }
 
       // ENG-06: delegate to engine.startGame — no duplicated deal logic here.
@@ -412,6 +477,8 @@ export default class GameServer implements Party.Server {
       this.broadcastStateSecure()
       this.broadcastHands()
       this.broadcastSimStatePrivate()
+      // Phase 7: auto-submit bot slots for the first sim_day.
+      await this.executeBotSimDay()
       return
     }
 
@@ -426,76 +493,15 @@ export default class GameServer implements Party.Server {
       this.state.hands[sessionId] = updatedPlayer.hand
 
       if (roundEnded) {
-        const allRecords = this.getAllPlayerRecords()
-        allRecords[playerRecord.position] = { ...allRecords[playerRecord.position], hand: updatedPlayer.hand }
-        const { updatedGame: finalGame, updatedPlayers, result } = endRound(updatedGame, allRecords)
-
-        updatedPlayers.forEach(p => {
-          this.state!.hands[p.sessionId] = p.hand
-          const sess = this.state!.sessions[p.sessionId]
-          if (sess) {
-            this.state!.sessions[p.sessionId] = { ...sess, money: p.money, paintings: p.paintings }
-          }
-        })
-
-        // Phase 3: auction round-end → transition phase. At end of round 4
-        // the game is over; otherwise we flow back into a sim_day with an
-        // incremented dayNumber and re-arm the submission timeout.
-        let nextPhase: GamePhase
-        if (finalGame.status === 'game_over') {
-          nextPhase = { type: 'game_over' }
-        } else {
-          const nextDayNumber = this.state.sim.dayNumber + 1
-          nextPhase = { type: 'sim_day', dayNumber: nextDayNumber, submittedSessionIds: [] }
-        }
-        this.state.game = { ...finalGame, phase: nextPhase, sim: this.state.sim }
-        if (nextPhase.type === 'sim_day') {
-          this.startSimDayTimeout()
-        } else {
-          this.clearSimDayTimeout()
-        }
-        // Phase 5 Plan 02: when the engine's endRound flipped status to
-        // game_over (round 4 resolved), compute per-player FinalAppraisals
-        // from the server-tracked neighborhoodHistory + playerSim snapshot
-        // and broadcast them to the room. T-5-11 mitigation: this branch
-        // runs ONLY when finalGame.status === 'game_over', which the engine
-        // sets exclusively at the end of round 4. No inbound message can
-        // force this path.
-        let finalAppraisals: Record<string, FinalAppraisal> | null = null
-        if (finalGame.status === 'game_over') {
-          finalAppraisals = {}
-          for (const p of finalGame.players) {
-            const ps = this.state.playerSim[p.sessionId]
-            if (!ps) continue
-            finalAppraisals[p.sessionId] = computeFinalAppraisal({
-              sessionId: p.sessionId,
-              displayName: p.displayName,
-              finalMoney: p.money,
-              playerSim: ps,
-              neighborhoodHistory: this.state.neighborhoodHistory[p.sessionId] ?? [],
-            })
-          }
-          this.state.lastFinalAppraisals = finalAppraisals
-        }
-        // ENG-09: persist last round result so reconnecting players can replay it
-        this.state.lastRoundResult = result
-        await this.persist()
-        this.broadcastStateSecure()
-        this.broadcastHands()
-        this.room.broadcast(JSON.stringify({ type: 'ROUND_END', result }))
-        if (finalAppraisals) {
-          this.room.broadcast(
-            JSON.stringify({
-              type: 'GAME_OVER_APPRAISALS',
-              appraisals: finalAppraisals,
-            }),
-          )
-        }
+        // Phase 7: extracted to handleRoundEnd for reuse by bot card plays.
+        await this.handleRoundEnd(updatedGame, updatedPlayer, playerRecord)
       } else {
         this.state.game = updatedGame
         await this.persist()
         this.broadcastStateSecure()
         sender.send(JSON.stringify({ type: 'YOUR_HAND', hand: updatedPlayer.hand }))
+        // Phase 7: next player might be a bot
+        await this.executeBotTurn()
       }
       return
     }
@@ -524,6 +530,7 @@ export default class GameServer implements Party.Server {
       await this.persist()
       this.broadcastStateSecure()
       sender.send(JSON.stringify({ type: 'YOUR_HAND', hand: updatedPlayer.hand }))
+      await this.executeBotTurn()
       return
     }
 
@@ -547,6 +554,7 @@ export default class GameServer implements Party.Server {
       if (auctioneerTakesFree) {
         this.room.broadcast(JSON.stringify({ type: 'DOUBLE_AUCTION_ABANDONED' }))
       }
+      await this.executeBotTurn()
       return
     }
 
@@ -556,6 +564,7 @@ export default class GameServer implements Party.Server {
       this.state.game = setFixedPrice(this.state.game, msg.price)
       await this.persist()
       this.broadcastStateSecure()
+      await this.executeBotTurn()
       return
     }
 
@@ -569,6 +578,7 @@ export default class GameServer implements Party.Server {
       this.applyPlayerUpdates(updatedGame, updatedPlayers)
       await this.persist()
       this.broadcastStateSecure()
+      await this.executeBotTurn()
       return
     }
 
@@ -587,6 +597,7 @@ export default class GameServer implements Party.Server {
       }
       await this.persist()
       this.broadcastStateSecure()
+      await this.executeBotTurn()
       return
     }
 
@@ -598,6 +609,7 @@ export default class GameServer implements Party.Server {
       this.state.game = placeOpenBid(this.state.game, session.position, msg.amount)
       await this.persist()
       this.broadcastStateSecure()
+      await this.executeBotTurn()
       return
     }
 
@@ -609,6 +621,7 @@ export default class GameServer implements Party.Server {
       this.applyPlayerUpdates(updatedGame, updatedPlayers)
       await this.persist()
       this.broadcastStateSecure()
+      await this.executeBotTurn()
       return
     }
 
@@ -626,6 +639,7 @@ export default class GameServer implements Party.Server {
       }
       await this.persist()
       this.broadcastStateSecure()
+      await this.executeBotTurn()
       return
     }
 
@@ -643,6 +657,7 @@ export default class GameServer implements Party.Server {
       }
       await this.persist()
       this.broadcastStateSecure()
+      await this.executeBotTurn()
       return
     }
 
@@ -688,6 +703,8 @@ export default class GameServer implements Party.Server {
       const activeSessionIds = Object.keys(this.state.sessions)
       if (activeSessionIds.length > 0 && activeSessionIds.every(id => submitted.has(id))) {
         await this.advanceFromSimDay('all_submitted')
+        // Phase 7: after sim day resolves, check if first turn is a bot
+        await this.executeBotTurn()
       }
       return
     }
@@ -904,7 +921,9 @@ export default class GameServer implements Party.Server {
 
   private startSimDayTimeout() {
     this.clearSimDayTimeout()
-    this.simDayTimer = setTimeout(() => {
+    this.simDayTimer = setTimeout(async () => {
+      // Phase 7: auto-submit bot slots before timeout-driven advance
+      await this.executeBotSimDay()
       void this.advanceFromSimDay('timeout')
     }, SIM_CONFIG.SUBMISSION_TIMEOUT_MS)
   }
@@ -1139,8 +1158,334 @@ export default class GameServer implements Party.Server {
       await this.persist()
       this.broadcastStateSecure()
       this.broadcastSimStatePrivate()
+      // Phase 7: after transitioning to auction_round, check if first turn is a bot
+      await this.executeBotTurn()
     } finally {
       this.advancingFromSimDay = false
+    }
+  }
+
+  // ─── Phase 7: Bot turn execution ──────────────────────────────────────────
+  //
+  // After any state change, check if the next action belongs to a bot. If so,
+  // execute it immediately via bot-engine + the same engine functions humans
+  // use. The botActing guard prevents re-entrant loops (T-7-05).
+
+  private botActing = false
+
+  private async executeBotTurn(): Promise<void> {
+    if (this.botActing) return
+    if (!this.state) return
+    const game = this.state.game
+    if (game.status !== 'playing') return
+    if (game.phase.type !== 'auction_round') return
+
+    this.botActing = true
+    try {
+      // No active auction: check if it's a bot's turn to play a card
+      if (!game.auction) {
+        const currentPlayer = game.players[game.currentPlayerIdx]
+        const session = this.state.sessions[currentPlayer?.sessionId]
+        if (!session?.isBot || !session.botPersonality) return
+
+        const hand = this.state.hands[session.sessionId] ?? []
+        if (hand.length === 0) return
+
+        const card = chooseBotCard(hand, game, session.botPersonality, Math.random())
+        const playerRecord = this.getPlayerRecord(session.sessionId)
+        if (!playerRecord) return
+
+        const { updatedGame, updatedPlayer, roundEnded } = playCard(game, playerRecord, card)
+        this.state.hands[session.sessionId] = updatedPlayer.hand
+
+        if (roundEnded) {
+          await this.handleRoundEnd(updatedGame, updatedPlayer, playerRecord)
+        } else {
+          this.state.game = updatedGame
+          await this.persist()
+          this.broadcastStateSecure()
+        }
+        // Recurse: the next player might also be a bot
+        this.botActing = false
+        await this.executeBotTurn()
+        return
+      }
+
+      // Active auction: delegate to bot auction handler
+      await this.executeBotAuctionAction()
+    } finally {
+      this.botActing = false
+    }
+  }
+
+  private async executeBotAuctionAction(): Promise<void> {
+    if (!this.state?.game.auction) return
+    const auction = this.state.game.auction
+    const game = this.state.game
+
+    // WAITING_SECOND: is it a bot's turn to play/pass the second card?
+    if (auction.status === 'waiting_second') {
+      const waitingPlayer = game.players[auction.waitingSecondCardIdx]
+      const session = this.state.sessions[waitingPlayer?.sessionId]
+      if (!session?.isBot || !session.botPersonality) return
+
+      const hand = this.state.hands[session.sessionId] ?? []
+      const secondCard = chooseBotSecondCard(hand, auction, session.botPersonality, Math.random())
+      if (secondCard) {
+        const playerRecord = this.getPlayerRecord(session.sessionId)!
+        const { updatedGame, updatedPlayer } = playSecondCard(game, playerRecord, secondCard)
+        this.state.game = updatedGame
+        this.state.hands[session.sessionId] = updatedPlayer.hand
+      } else {
+        const { updatedGame: ug, auctioneerTakesFree } = passSecondCard(game, auction.waitingSecondCardIdx)
+        this.state.game = ug
+        if (auctioneerTakesFree) {
+          this.room.broadcast(JSON.stringify({ type: 'DOUBLE_AUCTION_ABANDONED' }))
+        }
+      }
+      await this.persist()
+      this.broadcastStateSecure()
+      this.botActing = false
+      await this.executeBotTurn()
+      return
+    }
+
+    // SET_PRICE: is the auctioneer a bot who needs to set the fixed price?
+    if (auction.status === 'set_price') {
+      const auctioneer = game.players[auction.auctioneerIdx]
+      const session = this.state.sessions[auctioneer?.sessionId]
+      if (!session?.isBot || !session.botPersonality) return
+      const artist = auction.cards[0]?.artist
+      const perceived = (game.roundValues[artist] ?? 0) + (game.artistCounts[artist] ?? 0) * 5000
+      const price = Math.floor(perceived * (BOT_CONFIG.valuationMultiplier[session.botPersonality] ?? 1.0))
+      this.state.game = setFixedPrice(game, Math.max(1000, price))
+      await this.persist()
+      this.broadcastStateSecure()
+      this.botActing = false
+      await this.executeBotTurn()
+      return
+    }
+
+    // ACTIVE auction: dispatch by type
+    if (auction.status !== 'active') return
+
+    if (auction.auctionType === 'open') {
+      await this.executeBotOpenBids()
+      return
+    }
+
+    if (auction.auctionType === 'once_around') {
+      const currentPlayer = game.players[auction.onceAroundCurrentIdx]
+      const session = this.state.sessions[currentPlayer?.sessionId]
+      if (!session?.isBot || !session.botPersonality) return
+      const bid = chooseBotBid(auction, game, session.botPersonality, session.money, Math.random())
+      const allRecords = this.getAllPlayerRecords()
+      const result = placeOnceAroundBid(game, allRecords, session.position, bid)
+      if ('updatedPlayers' in result) {
+        this.applyPlayerUpdates(result.updatedGame, result.updatedPlayers)
+      } else {
+        this.state.game = result.updatedGame
+      }
+      await this.persist()
+      this.broadcastStateSecure()
+      this.botActing = false
+      await this.executeBotTurn()
+      return
+    }
+
+    if (auction.auctionType === 'sealed_bid') {
+      for (const p of game.players) {
+        const sess = this.state.sessions[p.sessionId]
+        if (!sess?.isBot || !sess.botPersonality) continue
+        if (auction.sealedBids[p.position ?? sess.position] !== undefined) continue
+        const bid = chooseBotBid(auction, game, sess.botPersonality, sess.money, Math.random())
+        const allRecords = this.getAllPlayerRecords()
+        const result = submitSealedBid(this.state.game, allRecords, sess.position, bid ?? 0)
+        if ('updatedPlayers' in result && result.updatedPlayers) {
+          this.applyPlayerUpdates(result.updatedGame, result.updatedPlayers)
+        } else {
+          this.state.game = result.updatedGame
+        }
+      }
+      await this.persist()
+      this.broadcastStateSecure()
+      this.botActing = false
+      await this.executeBotTurn()
+      return
+    }
+
+    if (auction.auctionType === 'fixed_price') {
+      const currentPlayer = game.players[auction.onceAroundCurrentIdx]
+      const session = this.state.sessions[currentPlayer?.sessionId]
+      if (!session?.isBot || !session.botPersonality) return
+      const bid = chooseBotBid(auction, game, session.botPersonality, session.money, Math.random())
+      if (bid !== null) {
+        const allRecords = this.getAllPlayerRecords()
+        const { updatedGame, updatedPlayers } = acceptFixedPrice(game, allRecords, session.position)
+        this.applyPlayerUpdates(updatedGame, updatedPlayers)
+      } else {
+        let updatedGame = passFixedPrice(game)
+        if (updatedGame.auction?.leadingBidderIdx !== null &&
+            updatedGame.auction?.leadingBidderIdx === updatedGame.auction?.auctioneerIdx) {
+          const allRecords = this.getAllPlayerRecords()
+          const { updatedGame: resolved, updatedPlayers } = acceptFixedPrice(updatedGame, allRecords, updatedGame.auction!.auctioneerIdx)
+          this.applyPlayerUpdates(resolved, updatedPlayers)
+        } else {
+          this.state.game = updatedGame
+        }
+      }
+      await this.persist()
+      this.broadcastStateSecure()
+      this.botActing = false
+      await this.executeBotTurn()
+      return
+    }
+  }
+
+  private async executeBotOpenBids(): Promise<void> {
+    if (!this.state?.game.auction) return
+    const game = this.state.game
+    const auction = game.auction!
+
+    // Each bot gets one chance to bid
+    for (const p of game.players) {
+      const sess = this.state.sessions[p.sessionId]
+      if (!sess?.isBot || !sess.botPersonality) continue
+      const bid = chooseBotBid(this.state.game.auction!, this.state.game, sess.botPersonality, sess.money, Math.random())
+      if (bid !== null) {
+        this.state.game = placeOpenBid(this.state.game, sess.position, bid)
+      }
+    }
+
+    // If the auctioneer is a bot and leading bidder is a bot (or null),
+    // auto-end the auction so it doesn't hang
+    const auctioneer = game.players[auction.auctioneerIdx]
+    const auctioneerSess = this.state.sessions[auctioneer?.sessionId]
+    if (auctioneerSess?.isBot && this.state.game.auction) {
+      const currentAuction = this.state.game.auction
+      const leadingIdx = currentAuction.leadingBidderIdx
+      // End auction if: there's a bid OR no one bid (auctioneer takes it)
+      const allRecords = this.getAllPlayerRecords()
+      const { updatedGame, updatedPlayers } = endOpenAuction(this.state.game, allRecords)
+      this.applyPlayerUpdates(updatedGame, updatedPlayers)
+    }
+
+    await this.persist()
+    this.broadcastStateSecure()
+    this.botActing = false
+    await this.executeBotTurn()
+  }
+
+  /**
+   * Phase 7: handle round-end logic extracted for reuse by both human PLAY_CARD
+   * and bot card plays. Performs endRound, session sync, phase transition,
+   * final appraisals, persist, broadcast.
+   */
+  private async handleRoundEnd(
+    updatedGame: GameState,
+    updatedPlayer: PlayerRecord,
+    playerRecord: PlayerRecord,
+  ): Promise<void> {
+    if (!this.state) return
+    const allRecords = this.getAllPlayerRecords()
+    allRecords[playerRecord.position] = { ...allRecords[playerRecord.position], hand: updatedPlayer.hand }
+    const { updatedGame: finalGame, updatedPlayers, result } = endRound(updatedGame, allRecords)
+
+    updatedPlayers.forEach(p => {
+      this.state!.hands[p.sessionId] = p.hand
+      const sess = this.state!.sessions[p.sessionId]
+      if (sess) {
+        this.state!.sessions[p.sessionId] = { ...sess, money: p.money, paintings: p.paintings }
+      }
+    })
+
+    let nextPhase: GamePhase
+    if (finalGame.status === 'game_over') {
+      nextPhase = { type: 'game_over' }
+    } else {
+      const nextDayNumber = this.state.sim.dayNumber + 1
+      nextPhase = { type: 'sim_day', dayNumber: nextDayNumber, submittedSessionIds: [] }
+    }
+    this.state.game = { ...finalGame, phase: nextPhase, sim: this.state.sim }
+    if (nextPhase.type === 'sim_day') {
+      this.startSimDayTimeout()
+    } else {
+      this.clearSimDayTimeout()
+    }
+
+    let finalAppraisals: Record<string, FinalAppraisal> | null = null
+    if (finalGame.status === 'game_over') {
+      finalAppraisals = {}
+      for (const p of finalGame.players) {
+        const ps = this.state.playerSim[p.sessionId]
+        if (!ps) continue
+        finalAppraisals[p.sessionId] = computeFinalAppraisal({
+          sessionId: p.sessionId,
+          displayName: p.displayName,
+          finalMoney: p.money,
+          playerSim: ps,
+          neighborhoodHistory: this.state.neighborhoodHistory[p.sessionId] ?? [],
+        })
+      }
+      this.state.lastFinalAppraisals = finalAppraisals
+    }
+    this.state.lastRoundResult = result
+    await this.persist()
+    this.broadcastStateSecure()
+    this.broadcastHands()
+    this.room.broadcast(JSON.stringify({ type: 'ROUND_END', result }))
+    if (finalAppraisals) {
+      this.room.broadcast(
+        JSON.stringify({
+          type: 'GAME_OVER_APPRAISALS',
+          appraisals: finalAppraisals,
+        }),
+      )
+    }
+
+    // Phase 7: after round-end, if next phase is sim_day, auto-submit bot slots
+    if (nextPhase.type === 'sim_day') {
+      await this.executeBotSimDay()
+    }
+  }
+
+  /**
+   * Phase 7: auto-submit bot slots when phase transitions to sim_day.
+   * Bots use chooseBotSlots from bot-engine to pick their day plan.
+   */
+  private async executeBotSimDay(): Promise<void> {
+    if (!this.state) return
+    if (this.state.game.phase.type !== 'sim_day') return
+
+    const phase = this.state.game.phase
+    const submitted = new Set(phase.submittedSessionIds)
+
+    for (const [sid, session] of Object.entries(this.state.sessions)) {
+      if (!session.isBot || !session.botPersonality) continue
+      if (submitted.has(sid)) continue
+
+      const ps = this.state.playerSim[sid]
+      if (!ps) continue
+
+      const slots = chooseBotSlots(ps, this.state.game, session.botPersonality, Math.random())
+      this.state.playerSim[sid] = { ...ps, scheduledSlots: slots }
+      submitted.add(sid)
+    }
+
+    this.state.game = {
+      ...this.state.game,
+      phase: { ...phase, submittedSessionIds: Array.from(submitted) },
+    }
+
+    await this.persist()
+    this.broadcastStateSecure()
+
+    // Check if all players (human + bot) have now submitted
+    const activeSessionIds = Object.keys(this.state.sessions)
+    if (activeSessionIds.length > 0 && activeSessionIds.every(id => submitted.has(id))) {
+      await this.advanceFromSimDay('all_submitted')
+      // After sim day resolves and transitions to auction_round, check bot turns
+      await this.executeBotTurn()
     }
   }
 
