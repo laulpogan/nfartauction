@@ -136,3 +136,16 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 4. Sim Depth — Relationships, Landlord, Drugs | 0/4 | Not started | - |
 | 5. NFT Layer & End State | 0/3 | Not started | - |
 | 6. Deployment & Polish | 1/1 | Complete | 2026-04-06 |
+
+### Phase 7: Bot Players
+
+**Goal:** Configurable AI bot players that bid in auctions and play the sim, responding to market state — enabling solo play and keeping multiplayer auctions competitive
+**Depends on:** Phase 6
+**Requirements:** BOT-01, BOT-02, BOT-03, BOT-04, BOT-05, BOT-06
+**Success Criteria** (what must be TRUE):
+  1. Host can set 0-3 bots in the lobby; bots appear as named players in the waiting room
+  2. Bots play cards on their turn, bid in all 5 auction types, and submit sim day slots without human intervention
+  3. A solo human player can complete a full 4-round game against 1-3 bots
+  4. Bot bidding varies by personality profile and responds to current artist valuations and market hotness
+  5. All bot logic runs server-side — no bot code in the client bundle
+**Plans:** TBD
