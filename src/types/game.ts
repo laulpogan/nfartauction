@@ -6,6 +6,8 @@ export type Artist = 'lite_metal' | 'yoko' | 'christine_p' | 'karl_gitter' | 'kr
 
 export type AuctionType = 'open' | 'once_around' | 'sealed_bid' | 'fixed_price' | 'double'
 
+export type BotPersonality = 'conservative' | 'aggressive' | 'erratic'
+
 export type GameStatus = 'lobby' | 'playing' | 'round_end' | 'game_over'
 
 export type AuctionStatus =
